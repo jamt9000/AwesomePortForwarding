@@ -3,17 +3,89 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Hello World!</title>
+    <title>Awesome Port Forwarding</title>
     <!-- https://electronjs.org/docs/tutorial/security#csp-meta-tag -->
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';" />
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' blob: ;" />
     <style>
+        ::-webkit-scrollbar {
+            background-color: #222;
+            width: .8em
+        }
+
+        ::-webkit-scrollbar-thumb:window-inactive,
+        ::-webkit-scrollbar-thumb {
+            background: #666;
+        }
+
+        body {
+            font: caption;
+            background: #222;
+            color: #ddd;
+        }
+
+        a,
+        a:hover,
+        a:active {
+            color: #eee;
+            text-decoration: none;
+        }
+
         i.icon {
             font-style: normal;
+            display: inline-block;
+            padding: 4px;
+        }
+
+        h1 {
+            font-variant: small-caps;
+            font-size: 15pt;
+            font-weight: bold;
+            padding: 0;
+            margin: 0;
+        }
+
+        ul a.host {
+            display: flex;
+            align-items: center;
+        }
+
+        ul li li {
+            display: flex;
+            align-items: center;
+        }
+
+        ul a ion-icon {
+            padding: 4px;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            margin-left: 10px;
+        }
+
+        ul ul {
+            padding-left: 10px;
+            margin-left: 12px;
+            border-left: solid 1px #666;
+        }
+
+        ul li {
+            display: block;
+            min-height: 20px;
+            padding: 2px;
+            vertical-align: middle;
+        }
+
+        ul li:hover {
+            background: #444;
         }
     </style>
 </head>
 
 <body>
+    <h1>ssh targets</h1>
     <ul id="hostsList">
 
     </ul>
@@ -23,64 +95,89 @@
     const electron = require('electron');
     const { ipcRenderer } = electron;
 
-    const hostsUl = document.getElementById("hostsList");
+    function escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
 
-    ipcRenderer.on('updateHostsList', (event, hostsList) => {
+    ipcRenderer.on('updateHostsState', (event, hostsState) => {
+        // Re-render the whole ul when the state changes
 
-        for (var i = 0; i < hostsList.length; i++) {
+        const hostsUl = document.getElementById('hostsList');
+        hostsUl.innerHTML = '';
+
+        for (var i = 0; i < hostsState.length; i++) {
             const li = document.createElement('li');
             const a = document.createElement('a');
 
-            const hostName = hostsList[i];
+            const hostName = hostsState[i]['hostName'];
 
-            a.textContent = hostName;
+            a.innerHTML = '<ion-icon name="desktop-outline"></ion-icon>' + escapeHtml(hostName) + '<i class="icon"></i>';
             a.href = '#';
+            a.className = 'host';
 
             li.appendChild(a);
-            li.appendChild(document.createElement('ul'))
+            li.appendChild(document.createElement('ul'));
 
-            console.log(hostsList[i]);
+            console.log(hostsState[i]);
 
-            a.addEventListener("click", function () {
-                const procInfo = ipcRenderer.sendSync('getRemotePorts', hostName);
-                console.log(procInfo);
-
-                const portUl = li.querySelector('ul');
-                portUl.textContent = '';
-
-                for (var i = 0; i < procInfo.length; i++) {
-                    const portLi = document.createElement('li');
-                    const port = procInfo[i].port;
-                    portLi.textContent = procInfo[i].command + ' :' + port;
-                    portLi.innerHTML = '<i class="icon"></i>' + portLi.innerHTML + '<span></span>';
-                    portLi.setAttribute('data-hostname', hostName);
-                    portLi.setAttribute('data-port', port);
-
-                    portLi.addEventListener("click", function (event) {
-                        event.target.querySelector('i').innerHTML = '⌛';
-                        ipcRenderer.send('forwardPort', hostName, port);
-
-                    });
-
-                    portUl.appendChild(portLi);
-                }
+            a.addEventListener("click", function (event) {
+                event.target.querySelector('i').innerHTML = '<ion-icon name="hourglass-outline"></ion-icon>';
+                ipcRenderer.send('getRemotePorts', hostName);
             });
 
+
+            const remoteProcesses = hostsState[i]['remoteProcesses'];
+            const portUl = li.querySelector('ul');
+
+
+            for (var j = 0; j < remoteProcesses.length; j++) {
+                const portLi = document.createElement('li');
+                const processEntry = remoteProcesses[j];
+                const port = processEntry.remotePort;
+                portLi.textContent = remoteProcesses[j].command + ' :' + port;
+                portLi.innerHTML = '<i class="icon"><ion-icon name="browsers-outline"></ion-icon></i><div>' + portLi.innerHTML + '<span></span></div><a></a>';
+                portLi.setAttribute('data-hostname', hostName);
+                portLi.setAttribute('data-port', port);
+
+                portLi.addEventListener("click", function (event) {
+                    portLi.querySelector('i').innerHTML = '<ion-icon name="hourglass-outline"></ion-icon>';
+                    ipcRenderer.send('forwardPort', hostName, port);
+
+                });
+
+                if (processEntry.localPort != null) {
+
+                    if (processEntry.faviconURL != null) {
+                        portLi.querySelector('i').innerHTML = '<img src="' + processEntry.faviconURL + '" height="16" width="16">';
+                    } else {
+                        portLi.querySelector('i').textContent = '✅';
+                    }
+                    portLi.querySelector('span').innerHTML = '→ :' + processEntry.localPort;
+                    portLi.querySelector('a').outerHTML = '<a target=_blank href="http://localhost:' + processEntry.localPort + '"><ion-icon name="globe-outline"></ion-icon></a>';
+                }
+
+                portUl.appendChild(portLi);
+            }
+
+
             hostsUl.appendChild(li);
+
         }
+
     });
 
-    ipcRenderer.on('forwardingSuccessful', (event, hostName, remotePort, localPort, favicons) => {
-        const elem = document.querySelector('li[data-hostname="' + hostName + '"][data-port="' + remotePort + '"]');
 
-        if (favicons && favicons.icons && favicons.icons.length) {
-            elem.querySelector('i').innerHTML = '<img src="' + favicons.icons[0].src + '" height="16" width="16">';
-        } else {
-            elem.querySelector('i').textContent = '✅';
-        }
-        elem.querySelector('span').innerHTML = '→ :' + localPort + ' <a target=_blank href="http://localhost:' + localPort + '">[🌐]</a>';
-    });
+    // Initialise list of hosts
+    ipcRenderer.send('requestUpdateHostsState');
 
 </script>
+
+<script type="module" src="node_modules/ionicons/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule src="node_modules/ionicons/dist/ionicons/ionicons.js"></script>
 
 </html>

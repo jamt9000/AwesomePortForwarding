@@ -4,11 +4,23 @@ const path = require('path');
 const fs = require('fs');
 const { spawn, spawnSync, execSync } = require('child_process');
 const getFavicons = require('get-website-favicon')
-const tcpPortUsed = require('tcp-port-used');
-
 
 
 let win;
+
+
+// Data structure representing SSH hosts,
+// remote processes and forwarded ports
+// as a list of 
+// [{"hostName": "hostname",
+//   "remoteProcesses": [{ "command": "command name",
+//                         "user": "username",
+//                         "pid": "1234",
+//                         "port": "8080" }]}, ...]
+
+let hostsState = null;
+const subprocesses = [];
+
 
 function sshConfigToHosts(sshConfig) {
     const hosts = [];
@@ -32,17 +44,6 @@ function createWindow() {
             nodeIntegration: true
         }
     })
-
-    sshConfigPath = path.join(process.env.HOME, '.ssh/config')
-    sshConfig = SSHConfig.parse(fs.readFileSync(sshConfigPath, 'utf8'));
-
-    console.log('Got ssh config');
-
-    win.webContents.on('did-finish-load', () => {
-        console.log('renderer loaded');
-        const hostsList = sshConfigToHosts(sshConfig);
-        win.webContents.send('updateHostsList', hostsList);
-    });
 
     // Open external links in browser
     win.webContents.on('new-window', function (e, url) {
@@ -79,7 +80,6 @@ app.on('activate', () => {
     }
 })
 
-const subprocesses = [];
 
 async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
 
@@ -109,20 +109,66 @@ async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
     if (succ) {
         console.log('Tunnel established')
         getFavicons('http://localhost:' + remotePort).then((favicons) => {
-            win.webContents.send('forwardingSuccessful', hostName, remotePort, localPort, favicons);
+
+            let processEntry = null;
+
+            for (var i = 0; i < hostsState.length; i++) {
+                if (hostsState[i]['hostName'] == hostName) {
+                    for (var j = 0; j < hostsState[i]['remoteProcesses'].length; j++) {
+                        if (hostsState[i]['remoteProcesses'][j]['remotePort'] == remotePort) {
+                            processEntry = hostsState[i]['remoteProcesses'][j];
+                        }
+                    }
+                }
+            }
+
+            let faviconURL = null;
+            if (favicons && favicons.icons && favicons.icons.length) {
+                faviconURL = favicons.icons[0].src;
+            } else if (processEntry != null && processEntry['command'].startsWith('python')) {
+                faviconURL = 'https://www.python.org/favicon.ico';
+            } else if (processEntry != null && processEntry['command'].startsWith('node')) {
+                faviconURL = 'https://nodejs.org/favicon.ico';
+            }
+
+            if (processEntry != null) {
+                processEntry['sshAgentPid'] = pid;
+                processEntry['localPort'] = localPort;
+                processEntry['faviconURL'] = faviconURL;
+            }
+
+
+            win.webContents.send('updateHostsState', hostsState);
+
+
         });
     }
 }
 
+ipcMain.on('requestUpdateHostsState', event => {
+    if (hostsState == null) {
+        const sshConfigPath = path.join(process.env.HOME, '.ssh/config')
+        const sshConfig = SSHConfig.parse(fs.readFileSync(sshConfigPath, 'utf8'));
+        const hostsList = sshConfigToHosts(sshConfig);
+
+        hostsState = [];
+
+        for (var i = 0; i < hostsList.length; i++) {
+            const stateEntry = { "hostName": hostsList[i], "remoteProcesses": [] }
+            hostsState.push(stateEntry);
+        }
+    }
+
+
+    win.webContents.send('updateHostsState', hostsState);
+
+});
 
 ipcMain.on('forwardPort', (event, hostName, remotePort) => {
     console.log('Forward ' + hostName + ':' + remotePort);
     let localPort = parseInt(remotePort);
 
     while (true) {
-        let portUsed = undefined;
-        tcpPortUsed.check(localPort);
-
         try {
             console.log(execSync('nc -z -G5 -w5 localhost ' + localPort));
             // Success means port is in use
@@ -132,16 +178,12 @@ ipcMain.on('forwardPort', (event, hostName, remotePort) => {
         }
     }
 
-
     const fwd = '' + localPort + ':localhost:' + remotePort;
     const spawned = spawn('ssh', ['-L', fwd, hostName, '-N']);
 
     subprocesses.push(spawned);
 
     waitForTunnel(spawned, hostName, remotePort, localPort);
-
-
-    //console.log(sub)
 });
 
 ipcMain.on('getRemotePorts', (event, hostName) => {
@@ -157,10 +199,20 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
         if (fields.length < 8) { continue }
         console.log(fields);
         const port = fields[8].split(':').pop();
-        const entry = { "command": fields[0], "user": fields[2], "pid": fields[1], "port": port };
+        const entry = {
+            "command": fields[0], "user": fields[2], "pid": fields[1],
+            "remotePort": port, "localPort": null, "sshAgentPid": null,
+            "faviconURL": null
+        };
         procInfo.push(entry);
     }
 
-    event.returnValue = procInfo;
+    // Update hosts state with the remote processes
+    for (var i = 0; i < hostsState.length; i++) {
+        if (hostsState[i]['hostName'] == hostName) {
+            hostsState[i]['remoteProcesses'] = procInfo;
+        }
+    }
 
+    win.webContents.send('updateHostsState', hostsState);
 });
