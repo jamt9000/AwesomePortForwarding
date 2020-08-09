@@ -91,10 +91,13 @@ async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
     for (var i = 0; i < tries; i++) {
         console.log('Try ' + i + ' pid ' + pid);
 
-        const sshprocs = '' + execSync("lsof -i -n | grep ssh | awk '{print $2}'");
+        const sshprocs = '' + execSync("lsof -P -i -n | grep '^ssh' | awk '{print $2}'");
         const count = (sshprocs.match(re) || []).length;
 
-        if (count >= 3) {
+        // When the tunnel is established, lsof will show over two connections
+        // made by the ssh process (for remote TCP port 22, local TCP on local port,
+        // and possibe duplicates for ipv6)
+        if (count >= 2) {
             succ = true;
             break;
         }
