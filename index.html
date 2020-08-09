@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Hello World!</title>
+    <!-- https://electronjs.org/docs/tutorial/security#csp-meta-tag -->
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';" />
+    <style>
+        i.icon {
+            font-style: normal;
+        }
+    </style>
+</head>
+
+<body>
+    <ul id="hostsList">
+
+    </ul>
+</body>
+
+<script>
+    const electron = require('electron');
+    const { ipcRenderer } = electron;
+
+    const hostsUl = document.getElementById("hostsList");
+
+    ipcRenderer.on('updateHostsList', (event, hostsList) => {
+
+        for (var i = 0; i < hostsList.length; i++) {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+
+            const hostName = hostsList[i];
+
+            a.textContent = hostName;
+            a.href = '#';
+
+            li.appendChild(a);
+            li.appendChild(document.createElement('ul'))
+
+            console.log(hostsList[i]);
+
+            a.addEventListener("click", function () {
+                const procInfo = ipcRenderer.sendSync('getRemotePorts', hostName);
+                console.log(procInfo);
+
+                const portUl = li.querySelector('ul');
+                portUl.textContent = '';
+
+                for (var i = 0; i < procInfo.length; i++) {
+                    const portLi = document.createElement('li');
+                    const port = procInfo[i].port;
+                    portLi.textContent = procInfo[i].command + ' :' + port;
+                    portLi.innerHTML = '<i class="icon"></i>' + portLi.innerHTML + '<span></span>';
+                    portLi.setAttribute('data-hostname', hostName);
+                    portLi.setAttribute('data-port', port);
+
+                    portLi.addEventListener("click", function (event) {
+                        event.target.querySelector('i').innerHTML = '⌛';
+                        ipcRenderer.send('forwardPort', hostName, port);
+
+                    });
+
+                    portUl.appendChild(portLi);
+                }
+            });
+
+            hostsUl.appendChild(li);
+        }
+    });
+
+    ipcRenderer.on('forwardingSuccessful', (event, hostName, remotePort, localPort, favicons) => {
+        const elem = document.querySelector('li[data-hostname="' + hostName + '"][data-port="' + remotePort + '"]');
+
+        if (favicons && favicons.icons && favicons.icons.length) {
+            elem.querySelector('i').innerHTML = '<img src="' + favicons.icons[0].src + '" height="16" width="16">';
+        } else {
+            elem.querySelector('i').textContent = '✅';
+        }
+        elem.querySelector('span').innerHTML = '→ :' + localPort + ' <a target=_blank href="http://localhost:' + localPort + '">[🌐]</a>';
+    });
+
+</script>
+
+</html>
