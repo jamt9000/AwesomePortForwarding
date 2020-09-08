@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { spawn, spawnSync, execSync } = require('child_process');
 const getFavicons = require('get-website-favicon')
+const getTitleAtUrl = require('get-title-at-url');
 
 
 let win;
@@ -108,39 +109,42 @@ async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
 
     if (succ) {
         console.log('Tunnel established')
-        getFavicons('http://localhost:' + remotePort).then((favicons) => {
+        const forwardedURL = 'http://localhost:' + remotePort;
+        getFavicons(forwardedURL).then((favicons) => {
+            getTitleAtUrl(forwardedURL, function (title) {
+                let processEntry = null;
 
-            let processEntry = null;
-
-            for (var i = 0; i < hostsState.length; i++) {
-                if (hostsState[i]['hostName'] == hostName) {
-                    for (var j = 0; j < hostsState[i]['remoteProcesses'].length; j++) {
-                        if (hostsState[i]['remoteProcesses'][j]['remotePort'] == remotePort) {
-                            processEntry = hostsState[i]['remoteProcesses'][j];
+                for (var i = 0; i < hostsState.length; i++) {
+                    if (hostsState[i]['hostName'] == hostName) {
+                        for (var j = 0; j < hostsState[i]['remoteProcesses'].length; j++) {
+                            if (hostsState[i]['remoteProcesses'][j]['remotePort'] == remotePort) {
+                                processEntry = hostsState[i]['remoteProcesses'][j];
+                            }
                         }
                     }
                 }
-            }
 
-            let faviconURL = null;
-            if (favicons && favicons.icons && favicons.icons.length) {
-                faviconURL = favicons.icons[0].src;
-            } else if (processEntry != null && processEntry['command'].startsWith('python')) {
-                faviconURL = 'https://www.python.org/favicon.ico';
-            } else if (processEntry != null && processEntry['command'].startsWith('node')) {
-                faviconURL = 'https://nodejs.org/favicon.ico';
-            }
+                let faviconURL = null;
+                if (favicons && favicons.icons && favicons.icons.length) {
+                    faviconURL = favicons.icons[0].src;
+                } else if (processEntry != null && processEntry['command'].startsWith('python')) {
+                    faviconURL = 'https://www.python.org/favicon.ico';
+                } else if (processEntry != null && processEntry['command'].startsWith('node')) {
+                    faviconURL = 'https://nodejs.org/favicon.ico';
+                }
 
-            if (processEntry != null) {
-                processEntry['sshAgentPid'] = pid;
-                processEntry['localPort'] = localPort;
-                processEntry['faviconURL'] = faviconURL;
-            }
+                if (processEntry != null) {
+                    processEntry['sshAgentPid'] = pid;
+                    processEntry['localPort'] = localPort;
+                    processEntry['faviconURL'] = faviconURL;
+                    if (title) {
+                        processEntry['command'] = title;
+                    }
+                }
 
 
-            win.webContents.send('updateHostsState', hostsState);
-
-
+                win.webContents.send('updateHostsState', hostsState);
+            });
         });
     }
 }
@@ -187,7 +191,7 @@ ipcMain.on('forwardPort', (event, hostName, remotePort) => {
 });
 
 ipcMain.on('getRemotePorts', (event, hostName) => {
-    const spawned = spawnSync('ssh', [hostName, '-C', 'lsof -i -P -n -sTCP:LISTEN']);
+    const spawned = spawnSync('ssh', [hostName, '-C', 'lsof -iTCP -P -n -sTCP:LISTEN']);
     const output = '' + spawned.stdout;
 
     console.log(output);
@@ -221,6 +225,48 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
         };
         procInfo.push(entry);
     }
+
+    // lsof may not show all processes without sudo
+    // netstat can show the open ports (without the PID)
+    // although the flags and output are not consistent cross-platform
+    // so this is an attempt to support both linux and macos/bsd
+
+    const ns_spawned = spawnSync('ssh', [hostName, '-C', "netstat -anp tcp | grep '^tcp' | grep '\\bLISTEN\\b'"]);
+    const ns_output = '' + ns_spawned.stdout;
+    const ns_rows = ns_output.split('\n');
+
+    console.log(output);
+
+    for (var i = 1; i < ns_rows.length; i++) {
+        const fields = ns_rows[i].split(/ +/);
+        if (fields.length < 3) { continue }
+
+        console.log(fields);
+
+        const port = fields[3].split(/[:\.]+/).pop();
+        const portInt = parseInt(port);
+
+        if ((portInt < 1000 || portInt > 9999) && portInt != 80 && portInt != 443) {
+            // Skip high/low port numbers except http(s)
+            continue;
+        }
+
+        if (portsUsed.indexOf(port) != -1) {
+            // Skip duplicate ports (due to ipv4 and ipv6)
+            continue;
+        }
+
+        portsUsed.push(port);
+
+        const entry = {
+            "command": "[unknown]", "user": null, "pid": null,
+            "remotePort": port, "localPort": null, "sshAgentPid": null,
+            "faviconURL": null
+        };
+        procInfo.push(entry);
+    }
+
+
 
     // Update hosts state with the remote processes
     for (var i = 0; i < hostsState.length; i++) {
