@@ -2,7 +2,7 @@
 
 Work-in-progress UI for forwarding ports. Inspired by VSCode, but without needing a new window for each remote machine.
 
-<img src="https://i.imgur.com/5VQtToj.png" width=300>
+<img src="https://i.imgur.com/7xIasX8.png" width=400>
 
 **Features:**
 
