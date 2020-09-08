@@ -1,6 +1,6 @@
 # Awesome Port Forwarding
 
-Work-in-progress UI for forwarding ports. Inspired by VSCode, but without needing a new window for each remote machine.
+Work-in-progress UI for forwarding ports. Inspired by VSCode's Remote SSH port forwarding, but without needing a new IDE window for each remote machine.
 
 <img src="https://i.imgur.com/7xIasX8.png" width=400>
 
@@ -15,6 +15,7 @@ Work-in-progress UI for forwarding ports. Inspired by VSCode, but without needin
 - [ ] Open a terminal on the given remote
 - [ ] Ability to refresh the connections and close existing ones
 - [ ] Check when connections die
+- [ ] Don't hang when something goes wrong 🙃
 
 ## Installing
 
