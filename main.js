@@ -55,7 +55,7 @@ function createWindow() {
     win.loadFile('index.html')
 
     // Open the DevTools.
-    win.webContents.openDevTools()
+    // win.webContents.openDevTools()
 }
 
 // This method will be called when Electron has finished
@@ -194,11 +194,26 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
 
     const rows = output.split('\n');
     const procInfo = [];
+    var portsUsed = [];
+
     for (var i = 1; i < rows.length; i++) {
         const fields = rows[i].split(/ +/);
         if (fields.length < 8) { continue }
         console.log(fields);
         const port = fields[8].split(':').pop();
+
+        if (parseInt(port) > 9999) {
+            // Skip high port numbers
+            continue;
+        }
+
+        if (portsUsed.indexOf(port) != -1) {
+            // Skip duplicate ports (due to ipv4 and ipv6)
+            continue;
+        }
+
+        portsUsed.push(port);
+
         const entry = {
             "command": fields[0], "user": fields[2], "pid": fields[1],
             "remotePort": port, "localPort": null, "sshAgentPid": null,
