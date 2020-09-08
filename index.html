@@ -144,14 +144,17 @@
                 portLi.setAttribute('data-hostname', hostName);
                 portLi.setAttribute('data-port', port);
 
-                portLi.addEventListener("click", function (event) {
-                    portLi.querySelector('i').innerHTML = '<ion-icon name="hourglass-outline"></ion-icon>';
-                    ipcRenderer.send('forwardPort', hostName, port);
 
-                });
 
-                if (processEntry.localPort != null) {
+                if (processEntry.localPort == null) {
+                    // Click to forward
+                    portLi.addEventListener("click", function (event) {
+                        portLi.querySelector('i').innerHTML = '<ion-icon name="hourglass-outline"></ion-icon>';
+                        ipcRenderer.send('forwardPort', hostName, port);
 
+                    });
+                } else {
+                    // Already forwarding, show info
                     if (processEntry.faviconURL != null) {
                         portLi.querySelector('i').innerHTML = '<img src="' + processEntry.faviconURL + '" height="16" width="16">';
                     } else {
