@@ -15,6 +15,7 @@ let win;
 // as a list of 
 // [{"hostName": "hostname",
 //   "remoteProcesses": [{ "command": "command name",
+//                         "title": "title from html",
 //                         "user": "username",
 //                         "pid": "1234",
 //                         "port": "8080" }]}, ...]
@@ -138,7 +139,7 @@ async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
                     processEntry['localPort'] = localPort;
                     processEntry['faviconURL'] = faviconURL;
                     if (title) {
-                        processEntry['command'] = title;
+                        processEntry['title'] = title;
                     }
                 }
 
@@ -219,7 +220,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
         portsUsed.push(port);
 
         const entry = {
-            "command": fields[0], "user": fields[2], "pid": fields[1],
+            "command": fields[0], "title": null, "user": fields[2], "pid": fields[1],
             "remotePort": port, "localPort": null, "sshAgentPid": null,
             "faviconURL": null
         };
@@ -237,7 +238,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
 
     console.log(output);
 
-    for (var i = 1; i < ns_rows.length; i++) {
+    for (var i = 0; i < ns_rows.length; i++) {
         const fields = ns_rows[i].split(/ +/);
         if (fields.length < 3) { continue }
 
@@ -259,7 +260,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
         portsUsed.push(port);
 
         const entry = {
-            "command": "[unknown]", "user": null, "pid": null,
+            "command": null, "title": null, "user": null, "pid": null,
             "remotePort": port, "localPort": null, "sshAgentPid": null,
             "faviconURL": null
         };

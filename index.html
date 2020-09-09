@@ -19,8 +19,9 @@
 
         body {
             font: caption;
-            background: #222;
+            background: #1E1E1E;
             color: #ddd;
+            -webkit-user-select: none;
         }
 
         a,
@@ -71,6 +72,10 @@
             border-left: solid 1px #666;
         }
 
+        ul ul:hover {
+            border-left: solid 1px #888;
+        }
+
         ul li {
             display: block;
             min-height: 20px;
@@ -79,7 +84,32 @@
         }
 
         ul li:hover {
-            background: #444;
+            background: #222;
+        }
+
+        ul li:hover .host{
+            text-decoration: underline;
+        }
+
+        .connectIcon {
+            display: none;
+            margin-left: 5px;
+        }
+
+        .processUnforwarded {
+            cursor: pointer;
+        }
+
+        .processUnforwarded:hover, .processForwarded:hover {
+            background: #292D2E;
+        }
+
+        .processUnforwarded:hover .connectIcon {
+            display: inline-block;
+        }
+
+        .processForwarded {
+            cursor: default;
         }
     </style>
 </head>
@@ -116,7 +146,7 @@
 
             const hostName = hostsState[i]['hostName'];
 
-            a.innerHTML = '<ion-icon name="desktop-outline"></ion-icon>' + escapeHtml(hostName) + '<i class="icon"></i>';
+            a.innerHTML = '<ion-icon name="desktop-outline"></ion-icon>' + escapeHtml(hostName) + '<ion-icon style="display:none" class="hostHourglass" name="hourglass-outline"></ion-icon>';
             a.href = '#';
             a.className = 'host';
 
@@ -126,7 +156,7 @@
             console.log(hostsState[i]);
 
             a.addEventListener("click", function (event) {
-                event.target.querySelector('i').innerHTML = '<ion-icon name="hourglass-outline"></ion-icon>';
+                event.target.querySelector('.hostHourglass').style = 'display:inline';
                 ipcRenderer.send('getRemotePorts', hostName);
             });
 
@@ -139,8 +169,13 @@
                 const portLi = document.createElement('li');
                 const processEntry = remoteProcesses[j];
                 const port = processEntry.remotePort;
-                portLi.textContent = remoteProcesses[j].command + ' :' + port;
-                portLi.innerHTML = '<i class="icon"><ion-icon name="browsers-outline"></ion-icon></i><div>' + portLi.innerHTML + '<span></span></div><a></a>';
+                const cmdName = remoteProcesses[j].command == null ? '[unknown]' : remoteProcesses[j].command;
+                const displayName = remoteProcesses[j].title == null ? cmdName : remoteProcesses[j].title;
+                const mouseOver = cmdName + (remoteProcesses[j].pid == null ? '' : (' pid=' + remoteProcesses[j].pid));
+
+                portLi.textContent = displayName + ' :' + port;
+                portLi.innerHTML = '<i class="icon"><ion-icon name="browsers-outline"></ion-icon></i><div title="' + mouseOver + '">' + portLi.innerHTML + '<span></span></div><a></a>';
+                portLi.innerHTML += '<ion-icon class="connectIcon" name="add-outline"></ion-icon>'
                 portLi.setAttribute('data-hostname', hostName);
                 portLi.setAttribute('data-port', port);
 
@@ -153,6 +188,7 @@
                         ipcRenderer.send('forwardPort', hostName, port);
 
                     });
+                    portLi.className = "processUnforwarded";
                 } else {
                     // Already forwarding, show info
                     if (processEntry.faviconURL != null) {
@@ -160,8 +196,9 @@
                     } else {
                         portLi.querySelector('i').textContent = '✅';
                     }
-                    portLi.querySelector('span').innerHTML = '→ :' + processEntry.localPort;
+                    portLi.querySelector('span').innerHTML = ' → :' + processEntry.localPort;
                     portLi.querySelector('a').outerHTML = '<a target=_blank href="http://localhost:' + processEntry.localPort + '"><ion-icon name="globe-outline"></ion-icon></a>';
+                    portLi.className = "processForwarded";
                 }
 
                 portUl.appendChild(portLi);
