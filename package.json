@@ -14,9 +14,8 @@
     "ssh-config": "^4.0.2"
   },
   "dependencies": {
-    "get-title-at-url": "^1.1.8",
     "get-website-favicon": "0.0.7",
     "ionicons": "^5.1.2",
-    "tcp-port-used": "^1.0.1"
+    "metafetch": "^2.0.0"
   }
 }

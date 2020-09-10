@@ -5,6 +5,7 @@ const fs = require('fs');
 const { spawn, spawnSync, execSync } = require('child_process');
 const getFavicons = require('get-website-favicon')
 const getTitleAtUrl = require('get-title-at-url');
+const metafetch = require('metafetch');
 
 
 let win;
@@ -112,8 +113,9 @@ async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
         console.log('Tunnel established')
         const forwardedURL = 'http://localhost:' + remotePort;
         getFavicons(forwardedURL).then((favicons) => {
-            getTitleAtUrl(forwardedURL, function (title) {
+            metafetch.fetch(forwardedURL, function (err, meta) {
                 let processEntry = null;
+                const title = meta ? (meta.title ? meta.title : null) : null;
 
                 for (var i = 0; i < hostsState.length; i++) {
                     if (hostsState[i]['hostName'] == hostName) {
@@ -132,7 +134,9 @@ async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
                     faviconURL = 'https://www.python.org/favicon.ico';
                 } else if (processEntry != null && processEntry['command'].startsWith('node')) {
                     faviconURL = 'https://nodejs.org/favicon.ico';
-                }
+                } else if (processEntry != null && processEntry['command'].startsWith('ruby')) {
+                    faviconURL = 'https://www.ruby-lang.org/favicon.ico';
+                } 
 
                 if (processEntry != null) {
                     processEntry['sshAgentPid'] = pid;
