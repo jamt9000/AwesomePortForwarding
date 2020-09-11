@@ -161,6 +161,11 @@ async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
     }
 }
 
+ipcMain.on('sshConfigEdit', event => {
+    // Not very portable
+    execSync('(code ~/.ssh/config || subl ~/.ssh/config || xdg-open ~/.ssh/config || open ~/.ssh/config) &');
+});
+
 ipcMain.on('requestUpdateHostsState', event => {
     if (hostsState == null) {
         const sshConfigPath = path.join(process.env.HOME, '.ssh/config')

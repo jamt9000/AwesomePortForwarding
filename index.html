@@ -43,6 +43,18 @@
             font-weight: bold;
             padding: 0;
             margin: 0;
+            display: inline-block;
+        }
+
+        .header a {
+            display: none;
+            color: #3993FF;
+            font-size: small;
+            margin-left: 15px;
+        }
+
+        .header:hover a{
+            display: inline;
         }
 
         ul a.host {
@@ -123,7 +135,7 @@
 </head>
 
 <body>
-    <h1>ssh targets</h1>
+    <div class="header"><h1>ssh targets</h1> <a id="sshConfigLink" href="#">Edit ~/.ssh/config</a></div>
     <ul id="hostsList">
 
     </ul>
@@ -141,6 +153,10 @@
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
     }
+
+    document.getElementById("sshConfigLink").addEventListener("click", function (event) {
+        ipcRenderer.send('sshConfigEdit');
+    });
 
     ipcRenderer.on('updateHostsState', (event, hostsState) => {
         // Re-render the whole ul when the state changes
@@ -220,7 +236,7 @@
                 }
 
                 if (remoteProcesses.length == 0) {
-                    
+
                 }
 
                 portUl.appendChild(portLi);
