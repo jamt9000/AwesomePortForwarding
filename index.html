@@ -87,7 +87,7 @@
             background: #222;
         }
 
-        ul li:hover .host{
+        ul li:hover .host {
             text-decoration: underline;
         }
 
@@ -96,20 +96,28 @@
             margin-left: 5px;
         }
 
-        .processUnforwarded {
+        .processUnforwarded,
+        .processDead {
             cursor: pointer;
         }
 
-        .processUnforwarded:hover, .processForwarded:hover {
+        .processUnforwarded:hover,
+        .processForwarded:hover,
+        .processDead:hover {
             background: #292D2E;
         }
 
-        .processUnforwarded:hover .connectIcon {
+        .processUnforwarded:hover .connectIcon,
+        .processDead:hover .connectIcon {
             display: inline-block;
         }
 
         .processForwarded {
             cursor: default;
+        }
+
+        .processDead {
+            text-decoration: line-through;
         }
     </style>
 </head>
@@ -179,9 +187,7 @@
                 portLi.setAttribute('data-hostname', hostName);
                 portLi.setAttribute('data-port', port);
 
-
-
-                if (processEntry.localPort == null) {
+                if (processEntry.state == "unforwarded") {
                     // Click to forward
                     portLi.addEventListener("click", function (event) {
                         portLi.querySelector('i').innerHTML = '<ion-icon name="hourglass-outline"></ion-icon>';
@@ -189,7 +195,7 @@
 
                     });
                     portLi.className = "processUnforwarded";
-                } else {
+                } else if (processEntry.state == "forwarded") {
                     // Already forwarding, show info
                     if (processEntry.faviconURL != null) {
                         portLi.querySelector('i').innerHTML = '<img src="' + processEntry.faviconURL + '" height="16" width="16">';
@@ -199,11 +205,26 @@
                     portLi.querySelector('span').innerHTML = ' → :' + processEntry.localPort;
                     portLi.querySelector('a').outerHTML = '<a target=_blank href="http://localhost:' + processEntry.localPort + '"><ion-icon name="globe-outline"></ion-icon></a>';
                     portLi.className = "processForwarded";
+                } else if (processEntry.state == "dead") {
+                    // Dead
+                    portLi.querySelector('i').innerHTML = '<ion-icon name="skull-outline"></ion-icon>';
+                    portLi.querySelector('span').innerHTML = ' → :' + processEntry.localPort;
+                    portLi.className = "processDead";
+
+                    // Click to re-forward
+                    portLi.addEventListener("click", function (event) {
+                        portLi.querySelector('i').innerHTML = '<ion-icon name="hourglass-outline"></ion-icon>';
+                        ipcRenderer.send('forwardPort', hostName, port);
+
+                    });
+                }
+
+                if (remoteProcesses.length == 0) {
+                    
                 }
 
                 portUl.appendChild(portLi);
             }
-
 
             hostsUl.appendChild(li);
 

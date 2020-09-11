@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron')
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron')
 const SSHConfig = require('ssh-config');
 const path = require('path');
 const fs = require('fs');
@@ -19,7 +19,9 @@ let win;
 //                         "title": "title from html",
 //                         "user": "username",
 //                         "pid": "1234",
-//                         "port": "8080" }]}, ...]
+//                         "port": "8080",
+//                         "state": "forwarded" // or "unforwarded" or "dead"
+// }]}, ...]
 
 let hostsState = null;
 const subprocesses = [];
@@ -83,6 +85,20 @@ app.on('activate', () => {
     }
 })
 
+function getProcessEntry(hostName, remotePort) {
+    let processEntry = null;
+
+    for (var i = 0; i < hostsState.length; i++) {
+        if (hostsState[i]['hostName'] == hostName) {
+            for (var j = 0; j < hostsState[i]['remoteProcesses'].length; j++) {
+                if (hostsState[i]['remoteProcesses'][j]['remotePort'] == remotePort) {
+                    processEntry = hostsState[i]['remoteProcesses'][j];
+                }
+            }
+        }
+    }
+    return processEntry;
+}
 
 async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
 
@@ -114,18 +130,9 @@ async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
         const forwardedURL = 'http://localhost:' + remotePort;
         getFavicons(forwardedURL).then((favicons) => {
             metafetch.fetch(forwardedURL, function (err, meta) {
-                let processEntry = null;
-                const title = meta ? (meta.title ? meta.title : null) : null;
+                let processEntry = getProcessEntry(hostName, remotePort);
 
-                for (var i = 0; i < hostsState.length; i++) {
-                    if (hostsState[i]['hostName'] == hostName) {
-                        for (var j = 0; j < hostsState[i]['remoteProcesses'].length; j++) {
-                            if (hostsState[i]['remoteProcesses'][j]['remotePort'] == remotePort) {
-                                processEntry = hostsState[i]['remoteProcesses'][j];
-                            }
-                        }
-                    }
-                }
+                const title = meta ? (meta.title ? meta.title : null) : null;
 
                 let faviconURL = null;
                 if (favicons && favicons.icons && favicons.icons.length) {
@@ -136,7 +143,7 @@ async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
                     faviconURL = 'https://nodejs.org/favicon.ico';
                 } else if (processEntry != null && processEntry['command'].startsWith('ruby')) {
                     faviconURL = 'https://www.ruby-lang.org/favicon.ico';
-                } 
+                }
 
                 if (processEntry != null) {
                     processEntry['sshAgentPid'] = pid;
@@ -145,8 +152,8 @@ async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
                     if (title) {
                         processEntry['title'] = title;
                     }
+                    processEntry["state"] = "forwarded";
                 }
-
 
                 win.webContents.send('updateHostsState', hostsState);
             });
@@ -168,7 +175,6 @@ ipcMain.on('requestUpdateHostsState', event => {
         }
     }
 
-
     win.webContents.send('updateHostsState', hostsState);
 
 });
@@ -189,6 +195,14 @@ ipcMain.on('forwardPort', (event, hostName, remotePort) => {
 
     const fwd = '' + localPort + ':localhost:' + remotePort;
     const spawned = spawn('ssh', ['-L', fwd, hostName, '-N']);
+
+    spawned.on('exit', function (errCode) {
+        let procInfo = getProcessEntry(hostName, remotePort);
+        if (procInfo) {
+            procInfo.state = "dead";
+        }
+        win.webContents.send('updateHostsState', hostsState);
+    });
 
     subprocesses.push(spawned);
 
@@ -226,7 +240,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
         const entry = {
             "command": fields[0], "title": null, "user": fields[2], "pid": fields[1],
             "remotePort": port, "localPort": null, "sshAgentPid": null,
-            "faviconURL": null
+            "faviconURL": null, "state": "unforwarded"
         };
         procInfo.push(entry);
     }
@@ -266,7 +280,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
         const entry = {
             "command": null, "title": null, "user": null, "pid": null,
             "remotePort": port, "localPort": null, "sshAgentPid": null,
-            "faviconURL": null
+            "faviconURL": null, "state": "unforwarded"
         };
         procInfo.push(entry);
     }
