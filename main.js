@@ -137,12 +137,14 @@ async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
                 let faviconURL = null;
                 if (favicons && favicons.icons && favicons.icons.length) {
                     faviconURL = favicons.icons[0].src;
-                } else if (processEntry != null && processEntry['command'].startsWith('python')) {
-                    faviconURL = 'https://www.python.org/favicon.ico';
-                } else if (processEntry != null && processEntry['command'].startsWith('node')) {
-                    faviconURL = 'https://nodejs.org/favicon.ico';
-                } else if (processEntry != null && processEntry['command'].startsWith('ruby')) {
-                    faviconURL = 'https://www.ruby-lang.org/favicon.ico';
+                } else if (processEntry != null && processEntry['command'] != null) {
+                    if (processEntry['command'].startsWith('python')) {
+                        faviconURL = 'https://www.python.org/favicon.ico';
+                    } else if (processEntry['command'].startsWith('node')) {
+                        faviconURL = 'https://nodejs.org/favicon.ico';
+                    } else if (processEntry['command'].startsWith('ruby')) {
+                        faviconURL = 'https://www.ruby-lang.org/favicon.ico';
+                    }
                 }
 
                 if (processEntry != null) {
