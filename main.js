@@ -102,6 +102,9 @@ function getProcessEntry(hostName, remotePort) {
 }
 
 async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
+    // Wait for the SSH tunnel to be established by repeatedly calling
+    // lsof until the connection is shown (with a 1s sleep between calls),
+    // timing out after 10 attempts
 
     const tries = 10;
     const pid = spawnedProc.pid;
@@ -222,6 +225,11 @@ ipcMain.on('forwardPort', (event, hostName, remotePort) => {
 });
 
 ipcMain.on('getRemotePorts', (event, hostName) => {
+    // Find the listening ports on the remote machine
+    // and if possible find which process it is
+    // We first try lsof, which may not show all ports
+    // without sudo, and then we try netstat
+
     const spawned = spawnSync('ssh', [hostName, '-C', 'lsof -iTCP -P -n -sTCP:LISTEN']);
     const output = '' + spawned.stdout;
 
@@ -283,7 +291,8 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
         }
 
         if (portsUsed.indexOf(port) != -1) {
-            // Skip duplicate ports (due to ipv4 and ipv6)
+            // Skip duplicate ports (due to ipv4 and ipv6) or already
+            // found by lsof approach
             continue;
         }
 
