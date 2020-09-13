@@ -15,6 +15,7 @@ let win;
 // remote processes and forwarded ports
 // as a list of 
 // [{"hostName": "hostname",
+//   "lastConnectionResult": "neverConnected", // or "lastConnectionFailed" or "lastConnectionSucceeded"
 //   "remoteProcesses": [{ "command": "command name",
 //                         "title": "title from html",
 //                         "user": "username",
@@ -177,7 +178,11 @@ ipcMain.on('requestUpdateHostsState', event => {
         hostsState = [];
 
         for (var i = 0; i < hostsList.length; i++) {
-            const stateEntry = { "hostName": hostsList[i], "remoteProcesses": [] }
+            const stateEntry = {
+                "hostName": hostsList[i],
+                "lastConnectionResult": "neverConnected",
+                "remoteProcesses": []
+            }
             hostsState.push(stateEntry);
         }
     }
@@ -298,6 +303,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
     for (var i = 0; i < hostsState.length; i++) {
         if (hostsState[i]['hostName'] == hostName) {
             hostsState[i]['remoteProcesses'] = procInfo;
+            hostsState[i]['lastConnectionResult'] = "lastConnectionSucceeded";
         }
     }
 

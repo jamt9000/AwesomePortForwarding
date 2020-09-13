@@ -53,7 +53,7 @@
             margin-left: 15px;
         }
 
-        .header:hover a{
+        .header:hover a {
             display: inline;
         }
 
@@ -135,7 +135,9 @@
 </head>
 
 <body>
-    <div class="header"><h1>ssh targets</h1> <a id="sshConfigLink" href="#">Edit ~/.ssh/config</a></div>
+    <div class="header">
+        <h1>ssh targets</h1> <a id="sshConfigLink" href="#">Edit ~/.ssh/config</a>
+    </div>
     <ul id="hostsList">
 
     </ul>
@@ -169,6 +171,7 @@
             const a = document.createElement('a');
 
             const hostName = hostsState[i]['hostName'];
+            const lastConnectionResult = hostsState[i]['lastConnectionResult'];
 
             a.innerHTML = '<ion-icon name="desktop-outline"></ion-icon>' + escapeHtml(hostName) + '<ion-icon style="display:none" class="hostHourglass" name="hourglass-outline"></ion-icon>';
             a.href = '#';
@@ -235,11 +238,13 @@
                     });
                 }
 
-                if (remoteProcesses.length == 0) {
 
-                }
 
                 portUl.appendChild(portLi);
+            }
+
+            if (remoteProcesses.length == 0 && lastConnectionResult == "lastConnectionSucceeded") {
+                portUl.innerHTML = '<li>No processes found</li>';
             }
 
             hostsUl.appendChild(li);
