@@ -395,8 +395,10 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
     const spawned = spawnSync('ssh', [hostName, '-C', 'lsof -iTCP -P -n -sTCP:LISTEN'], { "timeout": 6000 });
     const output = '' + spawned.stdout;
 
-    if (spawned.status != 0) {
-        // Connecting failed
+    if (spawned.status == 255 || spawned.status == null) {
+        // Connecting failed (255) or timed out (null status)
+        // (don't fail on other exit codes since lsof could
+        // fail or not exist even if the connection works)
         getHostEntry(hostsState, hostName)['lastConnectionResult'] = 'lastConnectionFailed';
         win.webContents.send('updateHostsState', hostsState);
         return;
