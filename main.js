@@ -187,26 +187,58 @@ async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
 }
 
 ipcMain.on('sshConfigEdit', event => {
+    const sshConfigPath = path.join(process.env.HOME, '.ssh/config');
+    const sshConfigDir = path.join(process.env.HOME, '.ssh');
+
+    if (!fs.existsSync(sshConfigDir)) {
+        fs.mkdirSync(sshConfigDir);
+    }
+
+    if (!fs.existsSync(sshConfigPath)) {
+        fs.closeSync(fs.openSync(sshConfigPath, 'w'));
+    }
+
     // Not very portable
     execSync('(code ~/.ssh/config || subl ~/.ssh/config || xdg-open ~/.ssh/config || open ~/.ssh/config) &');
 });
 
+function initializeHostsState() {
+    const sshConfigPath = path.join(process.env.HOME, '.ssh/config')
+
+    if (!fs.existsSync(sshConfigPath)) {
+        dialog.showMessageBox({
+            "message": "SSH Config file (" + sshConfigPath +
+                ") not found. You must put the hosts you want to connect to in this file."
+        });
+        return;
+    }
+
+    const sshConfig = SSHConfig.parse(fs.readFileSync(sshConfigPath, 'utf8'));
+    const hostsList = sshConfigToHosts(sshConfig);
+
+    hostsState = [];
+
+    for (var i = 0; i < hostsList.length; i++) {
+        const stateEntry = {
+            "hostName": hostsList[i],
+            "lastConnectionResult": "neverConnected",
+            "remoteProcesses": []
+        }
+        hostsState.push(stateEntry);
+    }
+
+    if (hostsState.length == 0) {
+        dialog.showMessageBox({
+            "message": "No hosts found in " + sshConfigPath +
+                ". You must put the hosts you want to connect to in this file. (Wildcards are currently not supported)."
+        });
+        return;
+    }
+}
+
 ipcMain.on('requestUpdateHostsState', event => {
     if (hostsState == null) {
-        const sshConfigPath = path.join(process.env.HOME, '.ssh/config')
-        const sshConfig = SSHConfig.parse(fs.readFileSync(sshConfigPath, 'utf8'));
-        const hostsList = sshConfigToHosts(sshConfig);
-
-        hostsState = [];
-
-        for (var i = 0; i < hostsList.length; i++) {
-            const stateEntry = {
-                "hostName": hostsList[i],
-                "lastConnectionResult": "neverConnected",
-                "remoteProcesses": []
-            }
-            hostsState.push(stateEntry);
-        }
+        initializeHostsState();
     }
 
     win.webContents.send('updateHostsState', hostsState);
@@ -314,7 +346,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
     // We first try lsof, which may not show all ports
     // without sudo, and then we try netstat
 
-    const spawned = spawnSync('ssh', [hostName, '-C', 'lsof -iTCP -P -n -sTCP:LISTEN'], {"timeout": 6000});
+    const spawned = spawnSync('ssh', [hostName, '-C', 'lsof -iTCP -P -n -sTCP:LISTEN'], { "timeout": 6000 });
     const output = '' + spawned.stdout;
 
     if (spawned.status != 0) {
@@ -361,7 +393,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
     // although the flags and output are not consistent cross-platform
     // so this is an attempt to support both linux and macos/bsd
 
-    const ns_spawned = spawnSync('ssh', [hostName, '-C', "netstat -anp tcp | grep '^tcp' | grep '\\bLISTEN\\b'"], {"timeout": 6000});
+    const ns_spawned = spawnSync('ssh', [hostName, '-C', "netstat -anp tcp | grep '^tcp' | grep '\\bLISTEN\\b'"], { "timeout": 6000 });
     const ns_output = '' + ns_spawned.stdout;
     const ns_rows = ns_output.split('\n');
 

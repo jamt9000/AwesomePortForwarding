@@ -136,7 +136,7 @@
 
 <body>
     <div class="header">
-        <h1>ssh targets</h1> <a id="sshConfigLink" href="#">Edit ~/.ssh/config</a>
+        <h1>ssh targets</h1> <a style="display:inline;" id="sshConfigLink" href="#">Edit ~/.ssh/config</a>
     </div>
     <ul id="hostsList">
 
@@ -165,6 +165,9 @@
 
         const hostsUl = document.getElementById('hostsList');
         hostsUl.innerHTML = '';
+
+        // If there are no hosts make the sshconfig edit link always visible
+        document.getElementById("sshConfigLink").style = hostsState.length ? "" : "display: inline;";
 
         for (var i = 0; i < hostsState.length; i++) {
             const li = document.createElement('li');
