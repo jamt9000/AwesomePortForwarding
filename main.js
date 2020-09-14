@@ -99,6 +99,16 @@ function getProcessFromList(processList, remotePort) {
     return processEntry;
 }
 
+function getHostEntry(hostName) {
+    let hostEntry = null;
+    for (var i = 0; i < hostsState.length; i++) {
+        if (hostsState[i]['hostName'] == hostName) {
+            hostEntry = hostsState[i];
+        }
+    }
+    return hostEntry;
+}
+
 function getProcessEntry(hostName, remotePort) {
     let processEntry = null;
 
@@ -304,8 +314,15 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
     // We first try lsof, which may not show all ports
     // without sudo, and then we try netstat
 
-    const spawned = spawnSync('ssh', [hostName, '-C', 'lsof -iTCP -P -n -sTCP:LISTEN']);
+    const spawned = spawnSync('ssh', [hostName, '-C', 'lsof -iTCP -P -n -sTCP:LISTEN'], {"timeout": 6000});
     const output = '' + spawned.stdout;
+
+    if (spawned.status != 0) {
+        // Connecting failed
+        getHostEntry(hostName)['lastConnectionResult'] = 'lastConnectionFailed';
+        win.webContents.send('updateHostsState', hostsState);
+        return;
+    }
 
     console.log(output);
 
@@ -344,7 +361,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
     // although the flags and output are not consistent cross-platform
     // so this is an attempt to support both linux and macos/bsd
 
-    const ns_spawned = spawnSync('ssh', [hostName, '-C', "netstat -anp tcp | grep '^tcp' | grep '\\bLISTEN\\b'"]);
+    const ns_spawned = spawnSync('ssh', [hostName, '-C', "netstat -anp tcp | grep '^tcp' | grep '\\bLISTEN\\b'"], {"timeout": 6000});
     const ns_output = '' + ns_spawned.stdout;
     const ns_rows = ns_output.split('\n');
 

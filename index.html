@@ -185,6 +185,7 @@
             a.addEventListener("click", function (event) {
                 event.target.querySelector('.hostHourglass').style = 'display:inline';
                 ipcRenderer.send('getRemotePorts', hostName);
+                event.preventDefault();
             });
 
 
@@ -238,8 +239,6 @@
                     });
                 }
 
-
-
                 portUl.appendChild(portLi);
             }
 
@@ -247,8 +246,11 @@
                 portUl.innerHTML = '<li>No processes found</li>';
             }
 
-            hostsUl.appendChild(li);
+            if (remoteProcesses.length == 0 && lastConnectionResult == "lastConnectionFailed") {
+                portUl.innerHTML = '<li>Failed to connect</li>';
+            }
 
+            hostsUl.appendChild(li);
         }
 
     });
