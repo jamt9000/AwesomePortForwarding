@@ -196,7 +196,7 @@ function watchSshConfig() {
             hostsState = mergeHostsState(hostsState, newHostsState);
             win.webContents.send('updateHostsState', hostsState);
         });
-        watchSshConfig = true;
+        watchingSshConfig = true;
     }
 }
 
