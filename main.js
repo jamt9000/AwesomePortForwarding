@@ -27,6 +27,9 @@ let win;
 //                         "faviconURL": 'http://...'
 // }]}, ...]
 
+const sshConfigPath = path.join(process.env.HOME, '.ssh/config');
+const sshConfigDir = path.join(process.env.HOME, '.ssh');
+
 let hostsState = null;
 const subprocesses = [];
 
@@ -36,7 +39,7 @@ function sshConfigToHosts(sshConfig) {
 
     for (var i = 0; i < sshConfig.length; i++) {
         const entry = sshConfig[i];
-        if (entry.param == "Host" && entry.value.indexOf('*') == -1) {
+        if (entry.param == "Host" && entry.value && entry.value.indexOf('*') == -1) {
             hosts.push(entry.value);
         }
     }
@@ -99,7 +102,7 @@ function getProcessFromList(processList, remotePort) {
     return processEntry;
 }
 
-function getHostEntry(hostName) {
+function getHostEntry(hostsState, hostName) {
     let hostEntry = null;
     for (var i = 0; i < hostsState.length; i++) {
         if (hostsState[i]['hostName'] == hostName) {
@@ -118,6 +121,83 @@ function getProcessEntry(hostName, remotePort) {
         }
     }
     return processEntry;
+}
+
+function hostsStateFromConfig() {
+    const sshConfig = SSHConfig.parse(fs.readFileSync(sshConfigPath, 'utf8'));
+    const hostsList = sshConfigToHosts(sshConfig);
+    const newHostsState = [];
+
+    for (var i = 0; i < hostsList.length; i++) {
+        const stateEntry = {
+            "hostName": hostsList[i],
+            "lastConnectionResult": "neverConnected",
+            "remoteProcesses": []
+        }
+        newHostsState.push(stateEntry);
+    }
+
+    return newHostsState;
+}
+
+function initializeHostsState() {
+    if (!fs.existsSync(sshConfigPath)) {
+        dialog.showMessageBox({
+            "message": "SSH Config file (" + sshConfigPath +
+                ") not found. You must put the hosts you want to connect to in this file."
+        });
+        return;
+    }
+
+    hostsState = hostsStateFromConfig();
+
+    if (hostsState.length == 0) {
+        dialog.showMessageBox({
+            "message": "No hosts found in " + sshConfigPath +
+                ". You must put the hosts you want to connect to in this file. (Wildcards are currently not supported)."
+        });
+    }
+
+    // Watch for changes to ssh config
+    watchSshConfig();
+}
+
+
+function mergeHostsState(oldHostsState, newHostsState) {
+    // Merge the current host state with one reloaded from
+    // the ssh config file. This could get quite complicated
+    // if we want to handle things like changed ip addresses
+    // and deleted or renamed hosts that we are currently forwarding.
+    // For now just re-associate the data when the hostnames
+    // match and ignore that we could have forwardings that
+    // are now invisible.
+
+    const mergedHostsState = [];
+
+    for (var i = 0; i < newHostsState.length; i++) {
+        const matchedHost = oldHostsState == null ? null : getHostEntry(oldHostsState, newHostsState[i].hostName);
+        if (matchedHost != null) {
+            mergedHostsState.push(matchedHost);
+        } else {
+            mergedHostsState.push(newHostsState[i]);
+        }
+    }
+
+    return mergedHostsState;
+}
+
+var watchingSshConfig = false;
+
+function watchSshConfig() {
+    if (!watchingSshConfig && fs.existsSync(sshConfigPath)) {
+        fs.watchFile(sshConfigPath, (curr, prev) => {
+            console.log('SSH config changed');
+            const newHostsState = hostsStateFromConfig();
+            hostsState = mergeHostsState(hostsState, newHostsState);
+            win.webContents.send('updateHostsState', hostsState);
+        });
+        watchSshConfig = true;
+    }
 }
 
 async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
@@ -187,54 +267,20 @@ async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
 }
 
 ipcMain.on('sshConfigEdit', event => {
-    const sshConfigPath = path.join(process.env.HOME, '.ssh/config');
-    const sshConfigDir = path.join(process.env.HOME, '.ssh');
-
     if (!fs.existsSync(sshConfigDir)) {
         fs.mkdirSync(sshConfigDir);
     }
 
     if (!fs.existsSync(sshConfigPath)) {
         fs.closeSync(fs.openSync(sshConfigPath, 'w'));
+        watchSshConfig();
     }
 
     // Not very portable
     execSync('(code ~/.ssh/config || subl ~/.ssh/config || xdg-open ~/.ssh/config || open ~/.ssh/config) &');
 });
 
-function initializeHostsState() {
-    const sshConfigPath = path.join(process.env.HOME, '.ssh/config')
 
-    if (!fs.existsSync(sshConfigPath)) {
-        dialog.showMessageBox({
-            "message": "SSH Config file (" + sshConfigPath +
-                ") not found. You must put the hosts you want to connect to in this file."
-        });
-        return;
-    }
-
-    const sshConfig = SSHConfig.parse(fs.readFileSync(sshConfigPath, 'utf8'));
-    const hostsList = sshConfigToHosts(sshConfig);
-
-    hostsState = [];
-
-    for (var i = 0; i < hostsList.length; i++) {
-        const stateEntry = {
-            "hostName": hostsList[i],
-            "lastConnectionResult": "neverConnected",
-            "remoteProcesses": []
-        }
-        hostsState.push(stateEntry);
-    }
-
-    if (hostsState.length == 0) {
-        dialog.showMessageBox({
-            "message": "No hosts found in " + sshConfigPath +
-                ". You must put the hosts you want to connect to in this file. (Wildcards are currently not supported)."
-        });
-        return;
-    }
-}
 
 ipcMain.on('requestUpdateHostsState', event => {
     if (hostsState == null) {
@@ -351,7 +397,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
 
     if (spawned.status != 0) {
         // Connecting failed
-        getHostEntry(hostName)['lastConnectionResult'] = 'lastConnectionFailed';
+        getHostEntry(hostsState, hostName)['lastConnectionResult'] = 'lastConnectionFailed';
         win.webContents.send('updateHostsState', hostsState);
         return;
     }
