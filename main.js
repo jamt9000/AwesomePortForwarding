@@ -20,8 +20,11 @@ let win;
 //                         "title": "title from html",
 //                         "user": "username",
 //                         "pid": "1234",
-//                         "port": "8080",
-//                         "state": "forwarded" // or "unforwarded" or "dead"
+//                         "remotePort": "8080",
+//                         "state": "forwarded", // or "unforwarded" or "dead"
+//                         "sshAgentPid": 1234,
+//                         "localPort": 8081,
+//                         "faviconURL": 'http://...'
 // }]}, ...]
 
 let hostsState = null;
@@ -86,16 +89,22 @@ app.on('activate', () => {
     }
 })
 
+function getProcessFromList(processList, remotePort) {
+    let processEntry = null;
+    for (var j = 0; j < processList.length; j++) {
+        if (processList[j]['remotePort'] == remotePort) {
+            processEntry = processList[j];
+        }
+    }
+    return processEntry;
+}
+
 function getProcessEntry(hostName, remotePort) {
     let processEntry = null;
 
     for (var i = 0; i < hostsState.length; i++) {
         if (hostsState[i]['hostName'] == hostName) {
-            for (var j = 0; j < hostsState[i]['remoteProcesses'].length; j++) {
-                if (hostsState[i]['remoteProcesses'][j]['remotePort'] == remotePort) {
-                    processEntry = hostsState[i]['remoteProcesses'][j];
-                }
-            }
+            processEntry = getProcessFromList(hostsState[i]['remoteProcesses'], remotePort);
         }
     }
     return processEntry;
@@ -224,6 +233,71 @@ ipcMain.on('forwardPort', (event, hostName, remotePort) => {
     waitForTunnel(spawned, hostName, remotePort, localPort);
 });
 
+
+function mergeProcessLists(oldProcessList, newProcessList) {
+    // * Add any currently-being-forwarded process info 
+    //   from oldProcessList to the new newProcessList
+    //
+    // * If any old process no longer exists then
+    //   show it as having died (?) (Not certain about this one - 
+    //   a process can die but the port forwarding will stick around.
+    //   There could also be a race condition where a new process is started and
+    //   forwarded on the same port and gets mislabelled as dead when the old
+    //   forwarding process dies)
+    //
+    //   processLists contain:
+    //
+    //   [{ "command": "command name",
+    //      "title": "title from html",
+    //      "user": "username",
+    //      "pid": "1234",
+    //      "remotePort": "8080",
+    //      "state": "forwarded", // or "unforwarded" or "dead"
+    //      "sshAgentPid": 1234,
+    //      "localPort": 8081,
+    //      "faviconURL": 'http://...'}, ...]
+
+    let mergedList = [];
+    let remotePortsMerged = [];
+
+    for (var i = 0; i < newProcessList.length; i++) {
+        let mergedInfo = {};
+        Object.assign(mergedInfo, newProcessList[i]);
+
+        let oldInfo = getProcessFromList(oldProcessList, mergedInfo["remotePort"]);
+
+        console.log(oldInfo)
+
+        if (oldInfo && oldInfo["state"] == "forwarded") {
+            mergedInfo["title"] = oldInfo["title"];
+            mergedInfo["state"] = oldInfo["state"];
+            mergedInfo["sshAgentPid"] = oldInfo["sshAgentPid"];
+            mergedInfo["localPort"] = oldInfo["localPort"];
+            mergedInfo["faviconURL"] = oldInfo["faviconURL"];
+        }
+
+        mergedList.push(mergedInfo);
+        remotePortsMerged.push(mergedInfo["remotePort"]);
+    }
+
+    for (var j = 0; j < oldProcessList.length; j++) {
+        let oldPort = oldProcessList[j]["remotePort"];
+
+        if (remotePortsMerged.indexOf(oldPort) == -1 && oldProcessList[j]["state"] != "dead") {
+            // A process we used to be showing no longer exists
+            let mergedInfo = {};
+            Object.assign(mergedInfo, oldProcessList[j]);
+            mergedInfo["state"] = "dead";
+
+            mergedList.push(mergedInfo);
+            //remotePortsMerged.push(mergedInfo["remotePort"]);
+        }
+    }
+
+    return mergedList;
+}
+
+
 ipcMain.on('getRemotePorts', (event, hostName) => {
     // Find the listening ports on the remote machine
     // and if possible find which process it is
@@ -236,7 +310,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
     console.log(output);
 
     const rows = output.split('\n');
-    const procInfo = [];
+    const processList = [];
     var portsUsed = [];
 
     for (var i = 1; i < rows.length; i++) {
@@ -262,7 +336,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
             "remotePort": port, "localPort": null, "sshAgentPid": null,
             "faviconURL": null, "state": "unforwarded"
         };
-        procInfo.push(entry);
+        processList.push(entry);
     }
 
     // lsof may not show all processes without sudo
@@ -303,15 +377,22 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
             "remotePort": port, "localPort": null, "sshAgentPid": null,
             "faviconURL": null, "state": "unforwarded"
         };
-        procInfo.push(entry);
+        processList.push(entry);
     }
-
-
 
     // Update hosts state with the remote processes
     for (var i = 0; i < hostsState.length; i++) {
         if (hostsState[i]['hostName'] == hostName) {
-            hostsState[i]['remoteProcesses'] = procInfo;
+            let newProcessList;
+
+            if (hostsState[i]['remoteProcesses'].length) {
+                console.log('merge process lists');
+                newProcessList = mergeProcessLists(hostsState[i]['remoteProcesses'], processList);
+            } else {
+                newProcessList = processList;
+            }
+
+            hostsState[i]['remoteProcesses'] = newProcessList;
             hostsState[i]['lastConnectionResult'] = "lastConnectionSucceeded";
         }
     }
