@@ -23,8 +23,8 @@ Work-in-progress UI for forwarding ports. Inspired by VSCode's Remote SSH port f
 git clone https://github.com/jamt9000/AwesomePortForwarding/
 cd AwesomePortForwarding
 npm install
-npm start
+./launch.sh
 ```
 
-Requires `nc` and `lsof` on the local and remote machines.
+Requires `nc` on the local machine and `lsof` or `netstat` on the remote machines.
 
