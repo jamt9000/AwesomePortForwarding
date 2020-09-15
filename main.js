@@ -2,7 +2,7 @@ const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron')
 const SSHConfig = require('ssh-config');
 const path = require('path');
 const fs = require('fs');
-const { spawn, spawnSync, execSync } = require('child_process');
+const { spawn, spawnSync, exec, execSync } = require('child_process');
 const getFavicons = require('get-website-favicon')
 const getTitleAtUrl = require('get-title-at-url');
 const metafetch = require('metafetch');
@@ -26,12 +26,20 @@ let win;
 //                         "localPort": 8081,
 //                         "faviconURL": 'http://...'
 // }]}, ...]
+let hostsState = null;
 
 const sshConfigPath = path.join(process.env.HOME, '.ssh/config');
 const sshConfigDir = path.join(process.env.HOME, '.ssh');
 
-let hostsState = null;
 const subprocesses = [];
+
+if (process.platform == 'darwin') {
+    // Mac does not natively have ssh-askpass or have an X11 DISPLAY, so we
+    // need to fake it
+    var sshEnv = { ...process.env, "DISPLAY": "1", "SSH_ASKPASS": path.join(__dirname, "askpass.osascript") };
+} else {
+    var sshEnv = { ...process.env };
+}
 
 
 function sshConfigToHosts(sshConfig) {
@@ -306,7 +314,7 @@ ipcMain.on('forwardPort', (event, hostName, remotePort) => {
     }
 
     const fwd = '' + localPort + ':localhost:' + remotePort;
-    const spawned = spawn('ssh', ['-L', fwd, hostName, '-N']);
+    const spawned = spawn('ssh', ['-L', fwd, hostName, '-N'], {"env": sshEnv});
 
     spawned.on('exit', function (errCode) {
         let procInfo = getProcessEntry(hostName, remotePort);
@@ -392,107 +400,120 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
     // We first try lsof, which may not show all ports
     // without sudo, and then we try netstat
 
-    const spawned = spawnSync('ssh', [hostName, '-C', 'lsof -iTCP -P -n -sTCP:LISTEN'], { "timeout": 6000 });
-    const output = '' + spawned.stdout;
+    const lsofCommand = "lsof -iTCP -P -n -sTCP:LISTEN"
+    const netstatCommand = "netstat -anp tcp | grep '^tcp' | grep '\\bLISTEN\\b'"
+    const sshCommand = 'ssh ' + hostName + ' -o NumberOfPasswordPrompts=1 -C "' + lsofCommand + ' ; echo AWESOME_SSH_SENTINEL ; ' + netstatCommand + '"';
 
-    if (spawned.status == 255 || spawned.status == null) {
-        // Connecting failed (255) or timed out (null status)
-        // (don't fail on other exit codes since lsof could
-        // fail or not exist even if the connection works)
-        getHostEntry(hostsState, hostName)['lastConnectionResult'] = 'lastConnectionFailed';
-        win.webContents.send('updateHostsState', hostsState);
-        return;
-    }
+    console.log(sshCommand);
 
-    console.log(output);
+    const spawned = exec(sshCommand,
+        { "env": sshEnv, "timeout": 20000 },
 
-    const rows = output.split('\n');
-    const processList = [];
-    var portsUsed = [];
+        function (err, stdout, stderr) {
+            let output = '' + stdout;
+            let code = err ? err.code : 0;
 
-    for (var i = 1; i < rows.length; i++) {
-        const fields = rows[i].split(/ +/);
-        if (fields.length < 8) { continue }
-        console.log(fields);
-        const port = fields[8].split(':').pop();
+            console.log(output);
 
-        if (parseInt(port) > 9999) {
-            // Skip high port numbers
-            continue;
-        }
-
-        if (portsUsed.indexOf(port) != -1) {
-            // Skip duplicate ports (due to ipv4 and ipv6)
-            continue;
-        }
-
-        portsUsed.push(port);
-
-        const entry = {
-            "command": fields[0], "title": null, "user": fields[2], "pid": fields[1],
-            "remotePort": port, "localPort": null, "sshAgentPid": null,
-            "faviconURL": null, "state": "unforwarded"
-        };
-        processList.push(entry);
-    }
-
-    // lsof may not show all processes without sudo
-    // netstat can show the open ports (without the PID)
-    // although the flags and output are not consistent cross-platform
-    // so this is an attempt to support both linux and macos/bsd
-
-    const ns_spawned = spawnSync('ssh', [hostName, '-C', "netstat -anp tcp | grep '^tcp' | grep '\\bLISTEN\\b'"], { "timeout": 6000 });
-    const ns_output = '' + ns_spawned.stdout;
-    const ns_rows = ns_output.split('\n');
-
-    console.log(output);
-
-    for (var i = 0; i < ns_rows.length; i++) {
-        const fields = ns_rows[i].split(/ +/);
-        if (fields.length < 3) { continue }
-
-        console.log(fields);
-
-        const port = fields[3].split(/[:\.]+/).pop();
-        const portInt = parseInt(port);
-
-        if ((portInt < 1000 || portInt > 9999) && portInt != 80 && portInt != 443) {
-            // Skip high/low port numbers except http(s)
-            continue;
-        }
-
-        if (portsUsed.indexOf(port) != -1) {
-            // Skip duplicate ports (due to ipv4 and ipv6) or already
-            // found by lsof approach
-            continue;
-        }
-
-        portsUsed.push(port);
-
-        const entry = {
-            "command": null, "title": null, "user": null, "pid": null,
-            "remotePort": port, "localPort": null, "sshAgentPid": null,
-            "faviconURL": null, "state": "unforwarded"
-        };
-        processList.push(entry);
-    }
-
-    // Update hosts state with the remote processes
-    for (var i = 0; i < hostsState.length; i++) {
-        if (hostsState[i]['hostName'] == hostName) {
-            let newProcessList;
-
-            if (hostsState[i]['remoteProcesses'].length) {
-                console.log('merge process lists');
-                newProcessList = mergeProcessLists(hostsState[i]['remoteProcesses'], processList);
-            } else {
-                newProcessList = processList;
+            if (code == 255 || code == null) {
+                // Connecting failed (255) or timed out (null status)
+                // (don't fail on other exit codes since lsof could
+                // fail or not exist even if the connection works)
+                console.log(`error code ${code}`);
+                getHostEntry(hostsState, hostName)['lastConnectionResult'] = 'lastConnectionFailed';
+                win.webContents.send('updateHostsState', hostsState);
+                return;
             }
 
-            hostsState[i]['remoteProcesses'] = newProcessList;
-            hostsState[i]['lastConnectionResult'] = "lastConnectionSucceeded";
-        }
-    }
+            const parts = output.split('AWESOME_SSH_SENTINEL')
 
-    win.webContents.send('updateHostsState', hostsState);
+            const lsofOutput = parts[0];
+            const netstatOutput = parts[1];
+
+            const rows = lsofOutput.split('\n');
+            const processList = [];
+            var portsUsed = [];
+
+            for (var i = 1; i < rows.length; i++) {
+                const fields = rows[i].split(/ +/);
+                if (fields.length < 8) { continue }
+                console.log(fields);
+                const port = fields[8].split(':').pop();
+
+                if (parseInt(port) > 9999) {
+                    // Skip high port numbers
+                    continue;
+                }
+
+                if (portsUsed.indexOf(port) != -1) {
+                    // Skip duplicate ports (due to ipv4 and ipv6)
+                    continue;
+                }
+
+                portsUsed.push(port);
+
+                const entry = {
+                    "command": fields[0], "title": null, "user": fields[2], "pid": fields[1],
+                    "remotePort": port, "localPort": null, "sshAgentPid": null,
+                    "faviconURL": null, "state": "unforwarded"
+                };
+                processList.push(entry);
+            }
+
+            // lsof may not show all processes without sudo
+            // netstat can show the open ports (without the PID)
+            // although the flags and output are not consistent cross-platform
+            // so this is an attempt to support both linux and macos/bsd
+
+            const ns_rows = netstatOutput.split('\n');
+
+            for (var i = 0; i < ns_rows.length; i++) {
+                const fields = ns_rows[i].split(/ +/);
+                if (fields.length < 3) { continue }
+
+                console.log(fields);
+
+                const port = fields[3].split(/[:\.]+/).pop();
+                const portInt = parseInt(port);
+
+                if ((portInt < 1000 || portInt > 9999) && portInt != 80 && portInt != 443) {
+                    // Skip high/low port numbers except http(s)
+                    continue;
+                }
+
+                if (portsUsed.indexOf(port) != -1) {
+                    // Skip duplicate ports (due to ipv4 and ipv6) or already
+                    // found by lsof approach
+                    continue;
+                }
+
+                portsUsed.push(port);
+
+                const entry = {
+                    "command": null, "title": null, "user": null, "pid": null,
+                    "remotePort": port, "localPort": null, "sshAgentPid": null,
+                    "faviconURL": null, "state": "unforwarded"
+                };
+                processList.push(entry);
+            }
+
+            // Update hosts state with the remote processes
+            for (var i = 0; i < hostsState.length; i++) {
+                if (hostsState[i]['hostName'] == hostName) {
+                    let newProcessList;
+
+                    if (hostsState[i]['remoteProcesses'].length) {
+                        console.log('merge process lists');
+                        newProcessList = mergeProcessLists(hostsState[i]['remoteProcesses'], processList);
+                    } else {
+                        newProcessList = processList;
+                    }
+
+                    hostsState[i]['remoteProcesses'] = newProcessList;
+                    hostsState[i]['lastConnectionResult'] = "lastConnectionSucceeded";
+                }
+            }
+
+            win.webContents.send('updateHostsState', hostsState);
+        });
 });

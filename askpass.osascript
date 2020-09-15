@@ -1,0 +1,5 @@
+#!/usr/bin/env osascript
+on run argv
+    display dialog argv with icon caution default button "OK" default answer "" with hidden answer
+    return result's text returned
+end run
