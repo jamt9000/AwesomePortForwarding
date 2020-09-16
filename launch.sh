@@ -16,7 +16,7 @@
 #export PATH=/usr/local/Cellar/util-linux/2.36/bin/:$PATH
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd $DIR
+cd "$DIR"
 
 if [ "$PPID" -eq 1 ]; then
     echo "Child of init"
@@ -28,7 +28,7 @@ else
         setsid npm start 0>&- 1>&- 2>&- &
     elif [ "$(uname)" == "Darwin" ]; then
         echo "Using open"
-        open -a $PWD/launch.sh
+        open -a "$PWD"/launch.sh
     else
         echo "Failed to detach"
         npm start 

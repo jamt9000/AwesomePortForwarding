@@ -33,6 +33,16 @@ const sshConfigDir = path.join(process.env.HOME, '.ssh');
 
 const subprocesses = [];
 
+process.on('exit', function () {
+    for (var i = 0; i < subprocesses.length; i++) {
+        try {
+            subprocesses[i].kill();
+        } catch (err) {
+
+        }
+    }
+});
+
 if (process.platform == 'darwin') {
     // Mac does not natively have ssh-askpass or have an X11 DISPLAY, so we
     // need to fake it
@@ -314,14 +324,18 @@ ipcMain.on('forwardPort', (event, hostName, remotePort) => {
     }
 
     const fwd = '' + localPort + ':localhost:' + remotePort;
-    const spawned = spawn('ssh', ['-L', fwd, hostName, '-N'], {"env": sshEnv});
+    const spawned = spawn('ssh', ['-L', fwd, hostName, '-N'], { "env": sshEnv });
 
     spawned.on('exit', function (errCode) {
         let procInfo = getProcessEntry(hostName, remotePort);
         if (procInfo) {
             procInfo.state = "dead";
         }
-        win.webContents.send('updateHostsState', hostsState);
+        try {
+            win.webContents.send('updateHostsState', hostsState);
+        } catch (err) {
+            // Will fail if app is exiting
+        }
     });
 
     subprocesses.push(spawned);
