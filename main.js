@@ -551,7 +551,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
 
 ipcMain.on('openTerminal', (event, hostName) => {
     if (process.platform == 'darwin') {
-        const applescript = `tell application "Terminal"\ndo script "ssh ${hostName}"\nend tell`;
+        const applescript = `tell application "Terminal"\nactivate\ndo script "ssh ${hostName}"\nend tell`;
         console.log(applescript);
         spawnSync('osascript', ['-e', applescript]);
     } else {
