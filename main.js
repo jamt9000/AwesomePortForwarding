@@ -551,10 +551,18 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
 
 ipcMain.on('openTerminal', (event, hostName) => {
     if (process.platform == 'darwin') {
-        const applescript = `tell application "Terminal"\nactivate\ndo script "ssh ${hostName}"\nend tell`;
-        console.log(applescript);
-        spawnSync('osascript', ['-e', applescript]);
+        spawnSync('open' ['ssh://' + hostName]);
     } else {
         exec(`gnome-terminal -- bash -c "ssh ${hostName}; exec bash" || xterm -hold -e 'ssh ${hostName}'`);
     }
+});
+
+ipcMain.on('openVSCode', (event, hostName) => {
+    try {
+        execSync('code --remote ssh-remote+' + hostName + ' .')
+      } catch(e) {
+        dialog.showMessageBox({
+            "message": "Could not launch VSCode. Make sure it is installed and the `code` command is set up."
+        });
+      }
 });

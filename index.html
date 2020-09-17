@@ -146,10 +146,12 @@
 
         .hostHeader {
             display: flex;
+            align-items: center;
         }
 
         .refreshLink,
-        .connectedHostLink {
+        .connectedHostLink,
+        .moreHostLink {
             display: none;
         }
 
@@ -157,7 +159,8 @@
             display: inline-flex;
         }
 
-        li.expanded.connected .hostHeader:hover a.connectedHostLink {
+        li.expanded.connected .hostHeader:hover a.connectedHostLink,
+        li.expanded.connected .hostHeader:hover a.moreHostLink {
             display: inline-flex;
         }
     </style>
@@ -174,7 +177,9 @@
 
 <script>
     const electron = require('electron');
-    const { ipcRenderer } = electron;
+    const { remote, ipcRenderer } = electron;
+    const { Menu, MenuItem } = remote
+
 
     function escapeHtml(unsafe) {
         return unsafe
@@ -184,6 +189,7 @@
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
     }
+
 
     document.getElementById("sshConfigLink").addEventListener("click", function (event) {
         ipcRenderer.send('sshConfigEdit');
@@ -209,7 +215,7 @@
             a.innerHTML = '<ion-icon name="desktop-sharp"></ion-icon>'
                 + escapeHtml(hostName)
                 + '<ion-icon style="display:none" class="hostHourglass" name="hourglass-outline"></ion-icon>'
-                + '<ion-icon class="refreshLink" name="refresh-outline"></ion-icon>';
+                + '<ion-icon title="Refresh" class="refreshLink" name="refresh-outline"></ion-icon>';
             a.href = '#';
             a.className = 'host';
             hostHeader.className = 'hostHeader';
@@ -218,10 +224,18 @@
             termLink.innerHTML = '<ion-icon name="terminal-outline"></ion-icon>';
             termLink.href = '#';
             termLink.className = "connectedHostLink";
+            termLink.title = "Open in terminal"
+
+            const moreLink = document.createElement('a')
+            moreLink.innerHTML = '<ion-icon name="ellipsis-horizontal-outline"></ion-icon>';
+            moreLink.href = '#';
+            moreLink.className = "moreHostLink";
+            termLink.title = "More options"
 
             li.appendChild(hostHeader);
             hostHeader.appendChild(a);
             hostHeader.appendChild(termLink);
+            hostHeader.appendChild(moreLink);
 
             li.appendChild(document.createElement('ul'));
 
@@ -237,6 +251,25 @@
                 ipcRenderer.send('openTerminal', hostName);
                 event.preventDefault();
             })
+
+            moreLink.addEventListener("click", function (event) {
+                const menu = new Menu()
+
+                menu.append(new MenuItem({
+                    label: 'Open in VSCode',
+                    click() {
+                        ipcRenderer.send('openVSCode', hostName);
+                    }
+                }));
+
+                /*menu.append(new MenuItem({
+                    label: 'Mount with sshfs',
+                    click() {
+                        //ipcRenderer.send('mountSshFs');
+                    }
+                }));*/
+                menu.popup(remote.getCurrentWindow());
+            });
 
 
             const remoteProcesses = hostsState[i]['remoteProcesses'];
@@ -259,7 +292,7 @@
                     + portLi.innerHTML
                     + '<span></span>'
                     + '</div>'
-                    + '<a href="#" target="_blank" class="forwardedLink browserLink"></a>'
+                    + '<a href="#" target="_blank" class="forwardedLink browserLink" title="Open in browser"></a>'
                     + '<a href="#" class="forwardedLink cancelLink"></a>'
                     + '<ion-icon class="connectIcon" name="add-outline"></ion-icon>';
 
