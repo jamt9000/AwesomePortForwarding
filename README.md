@@ -15,8 +15,9 @@ Work-in-progress UI for forwarding ports. Inspired by VSCode's Remote SSH port f
 - [x] Open a terminal on the given remote
 - [x] Ability to refresh the connections and close existing ones
 - [x] Check when connections die [kinda]
-- [ ] Don't hang when something goes wrong 🙃
+- [x] Don't hang when something goes wrong 🙃
 - [ ] Mount a remote with sshfs
+- [ ] Show #gpus?
 
 ## Installing
 
