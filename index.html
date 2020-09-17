@@ -33,7 +33,7 @@
 
         i.icon {
             font-style: normal;
-            display: inline-block;
+            display: inline-flex;
             padding: 4px;
         }
 
@@ -106,6 +106,18 @@
         .connectIcon {
             display: none;
             margin-left: 5px;
+        }
+
+        .forwardedLink {
+            display: inline-flex;
+        }
+
+        .cancelLink {
+            display: none;
+        }
+
+        .processForwarded:hover .cancelLink {
+            display: inline-flex;
         }
 
         .processUnforwarded,
@@ -205,8 +217,15 @@
                 const mouseOver = cmdName + (remoteProcesses[j].pid == null ? '' : (' pid=' + remoteProcesses[j].pid));
 
                 portLi.textContent = displayName + ' :' + port;
-                portLi.innerHTML = '<i class="icon"><ion-icon name="browsers-outline"></ion-icon></i><div title="' + mouseOver + '">' + portLi.innerHTML + '<span></span></div><a></a>';
-                portLi.innerHTML += '<ion-icon class="connectIcon" name="add-outline"></ion-icon>'
+                portLi.innerHTML = '<i class="icon"><ion-icon name="browsers-outline"></ion-icon></i>'
+                    + '<div title="' + mouseOver + '">'
+                    + portLi.innerHTML
+                    + '<span></span>'
+                    + '</div>'
+                    + '<a href="#" target="_blank" class="forwardedLink browserLink"></a>'
+                    + '<a href="#" class="forwardedLink cancelLink"></a>'
+                    + '<ion-icon class="connectIcon" name="add-outline"></ion-icon>';
+
                 portLi.setAttribute('data-hostname', hostName);
                 portLi.setAttribute('data-port', port);
 
@@ -226,7 +245,16 @@
                         portLi.querySelector('i').textContent = '✅';
                     }
                     portLi.querySelector('span').innerHTML = ' → :' + processEntry.localPort;
-                    portLi.querySelector('a').outerHTML = '<a target=_blank href="http://localhost:' + processEntry.localPort + '"><ion-icon name="globe-outline"></ion-icon></a>';
+                    portLi.querySelector('a.browserLink').innerHTML = '<ion-icon name="globe-outline"></ion-icon>';
+                    portLi.querySelector('a.browserLink').href = 'http://localhost:' + processEntry.localPort;
+                    portLi.querySelector('a.cancelLink').innerHTML = '<ion-icon name="close-outline"></ion-icon>';
+
+                    portLi.querySelector('a.cancelLink').addEventListener("click", function (event) {
+                        event.preventDefault();
+                        ipcRenderer.send("cancelForwarding", hostName, port);
+                    });
+
+
                     portLi.className = "processForwarded";
                 } else if (processEntry.state == "dead") {
                     // Dead

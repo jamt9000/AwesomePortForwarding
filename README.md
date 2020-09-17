@@ -13,7 +13,7 @@ Work-in-progress UI for forwarding ports. Inspired by VSCode's Remote SSH port f
 
 - [x] Support password and other auth besides public key [if ssh-askpass works]
 - [ ] Open a terminal on the given remote
-- [ ] Ability to refresh the connections and close existing ones
+- [x] Ability to refresh the connections and close existing ones
 - [x] Check when connections die [kinda]
 - [ ] Don't hang when something goes wrong 🙃
 - [ ] Mount a remote with sshfs

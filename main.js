@@ -350,6 +350,16 @@ ipcMain.on('forwardPort', (event, hostName, remotePort) => {
     waitForTunnel(spawned, hostName, remotePort, localPort);
 });
 
+ipcMain.on('cancelForwarding', (event, hostName, remotePort) => {
+    const proc = getProcessEntry(hostName, remotePort);
+
+    if (proc != null && proc.sshAgentPid != null) {
+        execSync("kill " + proc.sshAgentPid);
+    }
+
+    win.webContents.send('updateHostsState', hostsState);
+});
+
 
 function mergeProcessLists(oldProcessList, newProcessList) {
     // * Add any currently-being-forwarded process info 
