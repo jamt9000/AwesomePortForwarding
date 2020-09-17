@@ -26,7 +26,7 @@ It should work on MacOS and Linux with npm installed (eg. `brew install node` if
 git clone https://github.com/jamt9000/AwesomePortForwarding/
 cd AwesomePortForwarding
 npm install
-./launch.sh
+./launch.sh # or `npm start` to run with debug output in the terminal
 ```
 
 Requires `nc` and `ssh` (from OpenSSH) on the local machine and `lsof` or `netstat` on the remote machines.
