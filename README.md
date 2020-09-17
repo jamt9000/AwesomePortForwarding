@@ -12,7 +12,7 @@ Work-in-progress UI for forwarding ports. Inspired by VSCode's Remote SSH port f
 **TODO:**
 
 - [x] Support password and other auth besides public key [if ssh-askpass works]
-- [ ] Open a terminal on the given remote
+- [x] Open a terminal on the given remote
 - [x] Ability to refresh the connections and close existing ones
 - [x] Check when connections die [kinda]
 - [ ] Don't hang when something goes wrong 🙃
@@ -22,7 +22,7 @@ Work-in-progress UI for forwarding ports. Inspired by VSCode's Remote SSH port f
 
 It should work on MacOS and Linux with npm installed (eg. `brew install node` if you use homebrew)
 
-```
+```sh
 git clone https://github.com/jamt9000/AwesomePortForwarding/
 cd AwesomePortForwarding
 npm install

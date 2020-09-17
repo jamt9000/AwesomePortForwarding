@@ -58,7 +58,7 @@
         }
 
         ul a.host {
-            display: flex;
+            display: inline-flex;
             align-items: center;
         }
 
@@ -143,6 +143,23 @@
         .processDead {
             text-decoration: line-through;
         }
+
+        .hostHeader {
+            display: flex;
+        }
+
+        .refreshLink,
+        .connectedHostLink {
+            display: none;
+        }
+
+        li.expanded .hostHeader:hover .refreshLink {
+            display: inline-flex;
+        }
+
+        li.expanded.connected .hostHeader:hover a.connectedHostLink {
+            display: inline-flex;
+        }
     </style>
 </head>
 
@@ -184,28 +201,48 @@
         for (var i = 0; i < hostsState.length; i++) {
             const li = document.createElement('li');
             const a = document.createElement('a');
+            const hostHeader = document.createElement('div');
 
             const hostName = hostsState[i]['hostName'];
             const lastConnectionResult = hostsState[i]['lastConnectionResult'];
 
-            a.innerHTML = '<ion-icon name="desktop-outline"></ion-icon>' + escapeHtml(hostName) + '<ion-icon style="display:none" class="hostHourglass" name="hourglass-outline"></ion-icon>';
+            a.innerHTML = '<ion-icon name="desktop-sharp"></ion-icon>'
+                + escapeHtml(hostName)
+                + '<ion-icon style="display:none" class="hostHourglass" name="hourglass-outline"></ion-icon>'
+                + '<ion-icon class="refreshLink" name="refresh-outline"></ion-icon>';
             a.href = '#';
             a.className = 'host';
+            hostHeader.className = 'hostHeader';
 
-            li.appendChild(a);
+            const termLink = document.createElement('a')
+            termLink.innerHTML = '<ion-icon name="terminal-outline"></ion-icon>';
+            termLink.href = '#';
+            termLink.className = "connectedHostLink";
+
+            li.appendChild(hostHeader);
+            hostHeader.appendChild(a);
+            hostHeader.appendChild(termLink);
+
             li.appendChild(document.createElement('ul'));
 
             console.log(hostsState[i]);
 
             a.addEventListener("click", function (event) {
-                event.target.querySelector('.hostHourglass').style = 'display:inline';
+                a.querySelector('.hostHourglass').style = 'display:inline';
                 ipcRenderer.send('getRemotePorts', hostName);
                 event.preventDefault();
             });
 
+            termLink.addEventListener("click", function (event) {
+                ipcRenderer.send('openTerminal', hostName);
+                event.preventDefault();
+            })
+
 
             const remoteProcesses = hostsState[i]['remoteProcesses'];
             const portUl = li.querySelector('ul');
+
+
 
 
             for (var j = 0; j < remoteProcesses.length; j++) {
@@ -217,7 +254,7 @@
                 const mouseOver = cmdName + (remoteProcesses[j].pid == null ? '' : (' pid=' + remoteProcesses[j].pid));
 
                 portLi.textContent = displayName + ' :' + port;
-                portLi.innerHTML = '<i class="icon"><ion-icon name="browsers-outline"></ion-icon></i>'
+                portLi.innerHTML = '<i class="icon"><ion-icon name="browsers-sharp"></ion-icon></i>'
                     + '<div title="' + mouseOver + '">'
                     + portLi.innerHTML
                     + '<span></span>'
@@ -279,6 +316,16 @@
 
             if (remoteProcesses.length == 0 && lastConnectionResult == "lastConnectionFailed") {
                 portUl.innerHTML = '<li>Failed to connect</li>';
+            }
+
+            //debugger;
+
+            if (portUl.children.length != 0) {
+                li.className = 'expanded';
+            }
+
+            if (lastConnectionResult == "lastConnectionSucceeded") {
+                li.className += ' connected';
             }
 
             hostsUl.appendChild(li);

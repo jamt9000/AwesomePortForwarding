@@ -548,3 +548,13 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
             win.webContents.send('updateHostsState', hostsState);
         });
 });
+
+ipcMain.on('openTerminal', (event, hostName) => {
+    if (process.platform == 'darwin') {
+        const applescript = `tell application "Terminal"\ndo script "ssh ${hostName}"\nend tell`;
+        console.log(applescript);
+        spawnSync('osascript', ['-e', applescript]);
+    } else {
+        exec(`gnome-terminal -- bash -c "ssh ${hostName}; exec bash" || xterm -hold -e 'ssh ${hostName}'`);
+    }
+});
