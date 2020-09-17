@@ -315,7 +315,14 @@ ipcMain.on('forwardPort', (event, hostName, remotePort) => {
 
     while (true) {
         try {
-            console.log(execSync('nc -z -G5 -w5 localhost ' + localPort));
+            if (process.platform == 'darwin') {
+                // Mac may need the -G option, which is
+                // unavailable on Linux 
+                // https://stackoverflow.com/a/60918924
+                execSync('nc -z -G5 -w5 localhost ' + localPort);
+            } else {
+                execSync('nc -z -w5 localhost ' + localPort);
+            }
             // Success means port is in use
             localPort += 1;
         } catch (err) {
