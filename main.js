@@ -625,7 +625,7 @@ ipcMain.on('openSSHFS', (event, hostName) => {
     const cmd = `mkdir -p ${mountDir}; ` +
         `umount ${mountDir} 2>&- ; ` +
         `${sshfsCmd} || ${sshfsFallback} ;` +
-        `echo '\\nLaunching Finder. To unmount run:\\numount ${mountDir} ' ;` +
+        `echo -e '\\nLaunching Finder. To unmount run:\\numount ${mountDir} ' ;` +
         `xdg-open ${mountDir}/${pwd} 2>&- || open ${mountDir}/${pwd}`
 
     try {
