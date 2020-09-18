@@ -453,7 +453,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
 
             if (code == 255 || code == null) {
                 // Connecting failed (255) or timed out (null status)
-                // (don't fail on other exit codes since lsof could
+                // (don't fail on other exit codes since commands could
                 // fail or not exist even if the connection works)
                 console.log(`error code ${code}`);
                 getHostEntry(hostsState, hostName)['lastConnectionResult'] = 'lastConnectionFailed';
