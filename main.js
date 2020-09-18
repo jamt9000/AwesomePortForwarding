@@ -615,11 +615,14 @@ ipcMain.on('openNvidiaSmi', (event, hostName) => {
 ipcMain.on('openSSHFS', (event, hostName) => {
     let pwd = getHostEntry(hostsState, hostName)['defaultPwd'];
     pwd = pwd ? pwd : "";
-
     let mountDir = `~/ssh_mounts/${hostName}`;
+
+    let sshfsCmd = `sshfs -o allow_other,default_permissions,noappledouble,volname=${hostName} ${hostName}:/ ${mountDir}`
+    let sshfsFallback = `sshfs ${hostName}:/ ${mountDir}`
+
     const cmd = `mkdir -p ${mountDir}; ` +
                 `umount ${mountDir} 2>&- ; ` +
-                `sshfs -o allow_other,default_permissions,noappledouble,volname=${hostName} ${hostName}:/ ${mountDir} ;` +
+                `${sshfsCmd} || ${sshfsFallback} ;` +
                 `echo '\\nLaunching Finder. To unmount run:\\numount ${mountDir} ' ;` + 
                 `xdg-open ${mountDir}/${pwd} 2>&- || open ${mountDir}/${pwd}`
 
