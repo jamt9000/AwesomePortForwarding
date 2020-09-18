@@ -16,6 +16,8 @@ let win;
 // as a list of 
 // [{"hostName": "hostname",
 //   "lastConnectionResult": "neverConnected", // or "lastConnectionFailed" or "lastConnectionSucceeded"
+//   "uptime": "01:02:03 up x days ...",
+//   "gpuInfo": "name, memory.free..."
 //   "remoteProcesses": [{ "command": "command name",
 //                         "title": "title from html",
 //                         "user": "username",
@@ -24,7 +26,7 @@ let win;
 //                         "state": "forwarded", // or "unforwarded" or "dead"
 //                         "sshAgentPid": 1234,
 //                         "localPort": 8081,
-//                         "faviconURL": 'http://...'
+//                         "faviconURL": 'http://...',
 // }]}, ...]
 let hostsState = null;
 
@@ -150,7 +152,9 @@ function hostsStateFromConfig() {
         const stateEntry = {
             "hostName": hostsList[i],
             "lastConnectionResult": "neverConnected",
-            "remoteProcesses": []
+            "uptime": null,
+            "gpuInfo": null,
+            "remoteProcesses": [],
         }
         newHostsState.push(stateEntry);
     }
@@ -433,7 +437,8 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
 
     const lsofCommand = "lsof -iTCP -P -n -sTCP:LISTEN"
     const netstatCommand = "netstat -anp tcp | grep '^tcp' | grep '\\bLISTEN\\b'"
-    const sshCommand = 'ssh ' + hostName + ' -o NumberOfPasswordPrompts=1 -C "' + lsofCommand + ' ; echo AWESOME_SSH_SENTINEL ; ' + netstatCommand + '"';
+    const sshCommand = 'ssh ' + hostName + ' -o NumberOfPasswordPrompts=1 -C "' + lsofCommand + ' ; echo AWESOME_SSH_SENTINEL ; ' + netstatCommand +
+        ' ; echo AWESOME_SSH_SENTINEL ; uptime ; echo AWESOME_SSH_SENTINEL ; nvidia-smi --query-gpu=name,memory.free --format=csv' + '"';
 
     console.log(sshCommand);
 
@@ -460,6 +465,8 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
 
             const lsofOutput = parts[0];
             const netstatOutput = parts[1];
+            const uptime = parts[2].indexOf('up') == -1 ? null : parts[2].trim();
+            const gpuInfo = parts[3].indexOf('MiB') == -1 ? null : parts[3].trim();
 
             const rows = lsofOutput.split('\n');
             const processList = [];
@@ -542,6 +549,8 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
 
                     hostsState[i]['remoteProcesses'] = newProcessList;
                     hostsState[i]['lastConnectionResult'] = "lastConnectionSucceeded";
+                    hostsState[i]['uptime'] = uptime;
+                    hostsState[i]['gpuInfo'] = gpuInfo;
                 }
             }
 
@@ -551,7 +560,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
 
 ipcMain.on('openTerminal', (event, hostName) => {
     if (process.platform == 'darwin') {
-        spawnSync('open' ['ssh://' + hostName]);
+        spawnSync('open', ['ssh://' + hostName]);
     } else {
         exec(`gnome-terminal -- bash -c "ssh ${hostName}; exec bash" || xterm -hold -e 'ssh ${hostName}'`);
     }
@@ -560,9 +569,30 @@ ipcMain.on('openTerminal', (event, hostName) => {
 ipcMain.on('openVSCode', (event, hostName) => {
     try {
         execSync('code --remote ssh-remote+' + hostName + ' .')
-      } catch(e) {
+    } catch (e) {
         dialog.showMessageBox({
             "message": "Could not launch VSCode. Make sure it is installed and the `code` command is set up."
         });
-      }
+    }
+});
+
+
+ipcMain.on('openCyberduck', (event, hostName) => {
+    try {
+        execSync('open -a Cyberduck sftp://' + hostName);
+    } catch (e) {
+        dialog.showMessageBox({
+            "message": "Could not launch Cyberduck. Make sure it is installed in /Applications. You can install it from https://cyberduck.io/"
+        });
+    }
+});
+
+ipcMain.on('openNautilus', (event, hostName) => {
+    try {
+        execSync(`nautilus sftp://${hostName} || xdg-open sftp://${hostName}`);
+    } catch (e) {
+        dialog.showMessageBox({
+            "message": "Could not launch. Make sure nautilus is installed or the sftp:// handler is configured."
+        });
+    }
 });

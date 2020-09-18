@@ -179,6 +179,7 @@
     const electron = require('electron');
     const { remote, ipcRenderer } = electron;
     const { Menu, MenuItem } = remote
+    const isMac = remote.process.platform == "darwin";
 
 
     function escapeHtml(unsafe) {
@@ -210,6 +211,11 @@
             const hostHeader = document.createElement('div');
 
             const hostName = hostsState[i]['hostName'];
+            let uptime = hostsState[i]['uptime'];
+            uptime = uptime ? uptime.split(',')[0].substring(uptime.indexOf('up')).replace('  ', ' ') : '';
+            const gpuInfo = hostsState[i]['gpuInfo'];
+            const nGPUs = gpuInfo ? gpuInfo.split('\n').length -1 : 0;
+
             const lastConnectionResult = hostsState[i]['lastConnectionResult'];
 
             a.innerHTML = '<ion-icon name="desktop-sharp"></ion-icon>'
@@ -253,7 +259,23 @@
             })
 
             moreLink.addEventListener("click", function (event) {
-                const menu = new Menu()
+                event.preventDefault();
+                const menu = new Menu();
+                let topRow = hostName + ' | ' + uptime;
+                if (gpuInfo) {
+                    topRow += ` | ${nGPUs}xGPU`;
+                }
+
+                menu.append(new MenuItem({
+                    label: topRow,
+                    sublabel: 'asdf',
+                    enabled: false,
+                }));
+
+
+                menu.append(new MenuItem({
+                    type: 'separator'
+                }));
 
                 menu.append(new MenuItem({
                     label: 'Open in VSCode',
@@ -261,6 +283,22 @@
                         ipcRenderer.send('openVSCode', hostName);
                     }
                 }));
+
+                if (isMac) {
+                    menu.append(new MenuItem({
+                        label: 'Open in Cyberduck',
+                        click() {
+                            ipcRenderer.send('openCyberduck', hostName);
+                        }
+                    }));
+                } else {
+                    menu.append(new MenuItem({
+                        label: 'Open in Files',
+                        click() {
+                            ipcRenderer.send('openNautilus', hostName);
+                        }
+                    }));
+                }
 
                 /*menu.append(new MenuItem({
                     label: 'Mount with sshfs',
