@@ -596,3 +596,14 @@ ipcMain.on('openNautilus', (event, hostName) => {
         });
     }
 });
+
+ipcMain.on('openNvidiaSmi', (event, hostName) => {
+    const cmd = "watch -n1 nvidia-smi";
+    if (process.platform == 'darwin') {
+        const applescript = `tell application "Terminal"\nactivate\ndo script "ssh ${hostName} -t -C '${cmd}'"\nend tell`;
+        console.log(applescript);
+        spawnSync('osascript', ['-e', applescript]);
+    } else {
+        exec(`gnome-terminal -- bash -c "ssh ${hostName} -t -C '${cmd}'; exec bash" || xterm -hold -e "ssh ${hostName} -t -C '${cmd}'"`);
+    }
+});

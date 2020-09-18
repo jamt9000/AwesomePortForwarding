@@ -214,7 +214,7 @@
             let uptime = hostsState[i]['uptime'];
             uptime = uptime ? uptime.split(',')[0].substring(uptime.indexOf('up')).replace('  ', ' ') : '';
             const gpuInfo = hostsState[i]['gpuInfo'];
-            const nGPUs = gpuInfo ? gpuInfo.split('\n').length -1 : 0;
+            const nGPUs = gpuInfo ? gpuInfo.split('\n').length - 1 : 0;
 
             const lastConnectionResult = hostsState[i]['lastConnectionResult'];
 
@@ -266,16 +266,8 @@
                     topRow += ` | ${nGPUs}xGPU`;
                 }
 
-                menu.append(new MenuItem({
-                    label: topRow,
-                    enabled: false,
-                }));
-
-
-                menu.append(new MenuItem({
-                    type: 'separator'
-                }));
-
+                menu.append(new MenuItem({ label: topRow, enabled: false, }));
+                menu.append(new MenuItem({ type: 'separator' }));
                 menu.append(new MenuItem({
                     label: 'Open in VSCode',
                     click() {
@@ -305,6 +297,15 @@
                         //ipcRenderer.send('mountSshFs');
                     }
                 }));*/
+
+                if (nGPUs) {
+                    menu.append(new MenuItem({
+                        label: 'View nvidia-smi',
+                        click() {
+                            ipcRenderer.send('openNvidiaSmi', hostName);
+                        }
+                    }));
+                }
                 menu.popup(remote.getCurrentWindow());
             });
 
