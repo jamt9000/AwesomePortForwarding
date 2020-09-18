@@ -592,13 +592,15 @@ ipcMain.on('openCyberduck', (event, hostName) => {
 });
 
 ipcMain.on('openNautilus', (event, hostName) => {
-    try {
-        execSync(`nautilus sftp://${hostName} || xdg-open sftp://${hostName}`);
-    } catch (e) {
-        dialog.showMessageBox({
-            "message": "Could not launch. Make sure nautilus is installed or the sftp:// handler is configured."
-        });
-    }
+    const child = exec(`nautilus sftp://${hostName} || xdg-open sftp://${hostName}`,
+        function (err, stdout, stderr) {
+            if (err && err.code != 0) {
+                dialog.showMessageBox({
+                    "message": "Could not launch. Make sure nautilus is installed or the sftp:// handler is configured."
+                });
+            }
+        }
+    );
 });
 
 ipcMain.on('openNvidiaSmi', (event, hostName) => {
@@ -621,14 +623,14 @@ ipcMain.on('openSSHFS', (event, hostName) => {
     let sshfsFallback = `sshfs ${hostName}:/ ${mountDir}`
 
     const cmd = `mkdir -p ${mountDir}; ` +
-                `umount ${mountDir} 2>&- ; ` +
-                `${sshfsCmd} || ${sshfsFallback} ;` +
-                `echo '\\nLaunching Finder. To unmount run:\\numount ${mountDir} ' ;` + 
-                `xdg-open ${mountDir}/${pwd} 2>&- || open ${mountDir}/${pwd}`
+        `umount ${mountDir} 2>&- ; ` +
+        `${sshfsCmd} || ${sshfsFallback} ;` +
+        `echo '\\nLaunching Finder. To unmount run:\\numount ${mountDir} ' ;` +
+        `xdg-open ${mountDir}/${pwd} 2>&- || open ${mountDir}/${pwd}`
 
     try {
         execSync('which sshfs');
-    } catch(err) {
+    } catch (err) {
         dialog.showMessageBox({
             "message": "Could not find the sshfs command. Make sure it is installed."
         });
