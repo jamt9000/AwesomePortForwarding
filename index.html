@@ -291,12 +291,12 @@
                     }));
                 }
 
-                /*menu.append(new MenuItem({
-                    label: 'Mount with sshfs',
+                menu.append(new MenuItem({
+                    label: 'Mount with SSHFS',
                     click() {
-                        //ipcRenderer.send('mountSshFs');
+                        ipcRenderer.send('openSSHFS', hostName);
                     }
-                }));*/
+                }));
 
                 if (nGPUs) {
                     menu.append(new MenuItem({

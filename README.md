@@ -16,8 +16,10 @@ Work-in-progress UI for forwarding ports. Inspired by VSCode's Remote SSH port f
 - [x] Ability to refresh the connections and close existing ones
 - [x] Check when connections die [kinda]
 - [x] Don't hang when something goes wrong 🙃
-- [ ] Mount a remote with sshfs
-- [ ] Show #gpus?
+- [x] Mount a remote with sshfs
+- [x] Show #gpus?
+- [ ] Forward a port that is not listed
+- [ ] Connect to hosts with a wildcard in ssh config
 
 ## Installing
 

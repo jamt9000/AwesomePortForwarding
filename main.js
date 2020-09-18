@@ -17,7 +17,8 @@ let win;
 // [{"hostName": "hostname",
 //   "lastConnectionResult": "neverConnected", // or "lastConnectionFailed" or "lastConnectionSucceeded"
 //   "uptime": "01:02:03 up x days ...",
-//   "gpuInfo": "name, memory.free..."
+//   "gpuInfo": "name, memory.free...",
+//   "defaultPwd": "/home/asdf",
 //   "remoteProcesses": [{ "command": "command name",
 //                         "title": "title from html",
 //                         "user": "username",
@@ -154,6 +155,7 @@ function hostsStateFromConfig() {
             "lastConnectionResult": "neverConnected",
             "uptime": null,
             "gpuInfo": null,
+            "defaultPwd": null,
             "remoteProcesses": [],
         }
         newHostsState.push(stateEntry);
@@ -438,7 +440,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
     const lsofCommand = "lsof -iTCP -P -n -sTCP:LISTEN"
     const netstatCommand = "netstat -anp tcp | grep '^tcp' | grep '\\bLISTEN\\b'"
     const sshCommand = 'ssh ' + hostName + ' -o NumberOfPasswordPrompts=1 -C "' + lsofCommand + ' ; echo AWESOME_SSH_SENTINEL ; ' + netstatCommand +
-        ' ; echo AWESOME_SSH_SENTINEL ; uptime ; echo AWESOME_SSH_SENTINEL ; nvidia-smi --query-gpu=name,memory.free --format=csv' + '"';
+        ' ; echo AWESOME_SSH_SENTINEL ; uptime ; echo AWESOME_SSH_SENTINEL ; pwd ; echo AWESOME_SSH_SENTINEL ; nvidia-smi --query-gpu=name,memory.free --format=csv' + '"';
 
     console.log(sshCommand);
 
@@ -466,7 +468,8 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
             const lsofOutput = parts[0];
             const netstatOutput = parts[1];
             const uptime = parts[2].indexOf('up') == -1 ? null : parts[2].trim();
-            const gpuInfo = parts[3].indexOf('MiB') == -1 ? null : parts[3].trim();
+            const pwd = parts[3].trim();
+            const gpuInfo = parts[4].indexOf('MiB') == -1 ? null : parts[4].trim();
 
             const rows = lsofOutput.split('\n');
             const processList = [];
@@ -551,6 +554,7 @@ ipcMain.on('getRemotePorts', (event, hostName) => {
                     hostsState[i]['lastConnectionResult'] = "lastConnectionSucceeded";
                     hostsState[i]['uptime'] = uptime;
                     hostsState[i]['gpuInfo'] = gpuInfo;
+                    hostsState[i]['defaultPwd'] = pwd;
                 }
             }
 
@@ -605,5 +609,35 @@ ipcMain.on('openNvidiaSmi', (event, hostName) => {
         spawnSync('osascript', ['-e', applescript]);
     } else {
         exec(`gnome-terminal -- bash -c "ssh ${hostName} -t -C '${cmd}'; exec bash" || xterm -hold -e "ssh ${hostName} -t -C '${cmd}'"`);
+    }
+});
+
+ipcMain.on('openSSHFS', (event, hostName) => {
+    let pwd = getHostEntry(hostsState, hostName)['defaultPwd'];
+    pwd = pwd ? pwd : "";
+
+    let mountDir = `~/ssh_mounts/${hostName}`;
+    const cmd = `mkdir -p ${mountDir}; ` +
+                `umount ${mountDir} 2>&- ; ` +
+                `sshfs -o allow_other,default_permissions,noappledouble,volname=${hostName} ${hostName}:/ ${mountDir} ;` +
+                `echo '\\nLaunching Finder. To unmount run:\\numount ${mountDir} ' ;` + 
+                `xdg-open ${mountDir}/${pwd} 2>&- || open ${mountDir}/${pwd}`
+
+    try {
+        execSync('which sshfs');
+    } catch(err) {
+        dialog.showMessageBox({
+            "message": "Could not find the sshfs command. Make sure it is installed."
+        });
+        return;
+    }
+
+    // Run in a terminal so the user can see the command, enter a password if needed, and check if anything breaks
+    if (process.platform == 'darwin') {
+        const applescript = `tell application "Terminal"\nactivate\ndo script "${cmd}"\nend tell`;
+        console.log(applescript);
+        spawnSync('osascript', ['-e', applescript]);
+    } else {
+        exec(`gnome-terminal -- bash -c "${cmd}; exec bash" || xterm -hold -e "${cmd}"`);
     }
 });
