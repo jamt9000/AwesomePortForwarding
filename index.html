@@ -298,6 +298,13 @@
                     }
                 }));
 
+                menu.append(new MenuItem({
+                    label: 'Copy Host config snippet',
+                    click() {
+                        ipcRenderer.send('copyHostConfigToClipboard', hostName);
+                    }
+                }));
+
                 if (nGPUs) {
                     menu.append(new MenuItem({
                         label: 'View nvidia-smi',

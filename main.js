@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron')
+const { app, BrowserWindow, Menu, ipcMain, dialog, clipboard } = require('electron')
 const SSHConfig = require('ssh-config');
 const path = require('path');
 const fs = require('fs');
@@ -703,4 +703,22 @@ ipcMain.on('openSSHFS', (event, hostName) => {
     } else {
         exec(`gnome-terminal -- bash -c "${cmd}; exec bash" || xterm -hold -e "${cmd}"`);
     }
+});
+
+ipcMain.on('copyHostConfigToClipboard', (event, hostName) => {
+    // Find the config lines that only appear when ~/.ssh/config is used and 
+    // and are not in the global config
+    const config = execSync(`comm -23 <(ssh -G ${hostName} | sort) <(ssh -F /etc/ssh/ssh_config -G ${hostName} | sort)`, {'shell': '/bin/bash'});
+    const lines = config.toString().split("\n");
+
+    var hostString = `Host ${hostName}\n`;
+
+
+    for (var i=0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line == '') { continue; }
+        console.log(line);
+        hostString += '    ' + line[0].toUpperCase() + line.slice(1) + '\n';
+    }
+    clipboard.writeText(hostString);
 });
