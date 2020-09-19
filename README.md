@@ -1,13 +1,17 @@
 # Awesome Port Forwarding
 
-Work-in-progress UI for forwarding ports. Inspired by VSCode's Remote SSH port forwarding, but without needing a new IDE window for each remote machine.
+<img src="cat.png" align="right" width=100>
 
-<img src="https://i.imgur.com/7xIasX8.png" width=400>
+A simple but powerful GUI for forwarding ports over SSH. Inspired by VSCode's Remote SSH port forwarding, but without needing a new IDE window for each remote machine.
+
+<img src="https://i.imgur.com/GpBJjc2.png" width=370>
 
 **Features:**
 
 * Connect to hosts given in `~/.ssh/config` file
 * Favicons!
+* Open a remote in a terminal or VSCode
+* Convenient shortcuts to mount with SSHFS and view nvidia-smi on GPU machines
 
 **TODO:**
 
