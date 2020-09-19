@@ -11,7 +11,6 @@ const metafetch = require('metafetch');
 let win;
 Menu.setApplicationMenu(null);
 
-
 // Data structure representing SSH hosts,
 // remote processes and forwarded ports
 // as a list of 
@@ -237,6 +236,51 @@ function watchSshConfig() {
         });
         watchingSshConfig = true;
     }
+}
+
+function getMacTerminal() {
+    // Use iTerm2 as the terminal on mac if it is registered as the SSH handler
+    // otherwise use Terminal
+
+    let term = "Terminal";
+
+    try {
+        const defaultApps = execSync('plutil -convert json ~/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist -o -');
+        let json = JSON.parse(defaultApps);
+
+        for (var i = 0; i < json['LSHandlers'].length; i++) {
+            if (json['LSHandlers'][i]['LSHandlerURLScheme'] == 'ssh') {
+                var app = json['LSHandlers'][i]['LSHandlerRoleAll'];
+                if (app == "com.googlecode.iterm2") {
+                    term = "iTerm";
+                }
+            }
+        }
+    } catch (err) {
+        term = "Terminal";
+    }
+    return term;
+}
+
+function runInMacTerminal(cmd) {
+    let term = getMacTerminal();
+    var cmd = cmd.replace(/"/g, `\\"`);
+
+    if (term == "Terminal") {
+        var applescript = `tell application "Terminal"\nactivate\ndo script "${cmd}"\nend tell`;
+    } else {
+        var applescript = `tell application "iTerm"
+        set newWindow to (create window with default profile)
+        tell current session of newWindow
+        write text "${cmd}"
+        end tell
+        end tell`
+    }
+
+    console.log(applescript);
+
+    spawnSync('osascript', ['-e', applescript]);
+
 }
 
 async function waitForTunnel(spawnedProc, hostName, remotePort, localPort) {
@@ -623,9 +667,7 @@ ipcMain.on('openNautilus', (event, hostName) => {
 ipcMain.on('openNvidiaSmi', (event, hostName) => {
     const cmd = "watch -n1 nvidia-smi";
     if (process.platform == 'darwin') {
-        const applescript = `tell application "Terminal"\nactivate\ndo script "ssh ${hostName} -t -C '${cmd}'"\nend tell`;
-        console.log(applescript);
-        spawnSync('osascript', ['-e', applescript]);
+        runInMacTerminal(`ssh ${hostName} -t -C '${cmd}'`);
     } else {
         exec(`gnome-terminal -- bash -c "ssh ${hostName} -t -C '${cmd}'; exec bash" || xterm -hold -e "ssh ${hostName} -t -C '${cmd}'"`);
     }
@@ -642,6 +684,7 @@ ipcMain.on('openSSHFS', (event, hostName) => {
     const cmd = `mkdir -p ${mountDir}; ` +
         `umount ${mountDir} 2>&- ; ` +
         `${sshfsCmd} || ${sshfsFallback} ;` +
+        `cd ${mountDir}/${pwd} ; ` +
         `echo -e '\\nLaunching Finder. To unmount run:\\numount ${mountDir} ' ;` +
         `xdg-open ${mountDir}/${pwd} 2>&- || open ${mountDir}/${pwd}`
 
@@ -656,9 +699,7 @@ ipcMain.on('openSSHFS', (event, hostName) => {
 
     // Run in a terminal so the user can see the command, enter a password if needed, and check if anything breaks
     if (process.platform == 'darwin') {
-        const applescript = `tell application "Terminal"\nactivate\ndo script "${cmd}"\nend tell`;
-        console.log(applescript);
-        spawnSync('osascript', ['-e', applescript]);
+        runInMacTerminal(cmd);
     } else {
         exec(`gnome-terminal -- bash -c "${cmd}; exec bash" || xterm -hold -e "${cmd}"`);
     }
