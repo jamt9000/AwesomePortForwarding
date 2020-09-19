@@ -23,6 +23,7 @@ cd "$DIR"
 # Hack to show name in mac menu
 if [ "$(uname)" == "Darwin" ]; then
 defaults write "$DIR"/node_modules/electron/dist/Electron.app/Contents/Info.plist CFBundleName -string "Awesome Port Forwarding" 2>&-
+cp "$DIR"/cat.icns "$DIR"/node_modules/electron/dist/Electron.app/Contents/Resources/electron.icns
 fi
 
 if [ "$PPID" -eq 1 ]; then
