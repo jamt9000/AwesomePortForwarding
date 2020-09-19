@@ -583,7 +583,9 @@ ipcMain.on('openVSCode', (event, hostName) => {
 
 ipcMain.on('openCyberduck', (event, hostName) => {
     try {
-        execSync('open -a Cyberduck sftp://' + hostName);
+        // For some reason it doesn't always launch the connection unless we open
+        // with no argument first
+        execSync(`open -a Cyberduck && open -a Cyberduck sftp://${hostName}`);
     } catch (e) {
         dialog.showMessageBox({
             "message": "Could not launch Cyberduck. Make sure it is installed in /Applications. You can install it from https://cyberduck.io/"
