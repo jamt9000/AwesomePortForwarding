@@ -9,6 +9,7 @@ const metafetch = require('metafetch');
 
 
 let win;
+Menu.setApplicationMenu(null);
 
 
 // Data structure representing SSH hosts,

@@ -15,8 +15,15 @@
 
 #export PATH=/usr/local/Cellar/util-linux/2.36/bin/:$PATH
 
+[ -z "$BASH" ] && { echo "Must be run with bash" ; exit ; }
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR"
+
+# Hack to show name in mac menu
+if [ "$(uname)" == "Darwin" ]; then
+defaults write "$DIR"/node_modules/electron/dist/Electron.app/Contents/Info.plist CFBundleName -string "Awesome Port Forwarding" 2>&-
+fi
 
 if [ "$PPID" -eq 1 ]; then
     echo "Child of init"
