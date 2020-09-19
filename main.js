@@ -59,9 +59,22 @@ function sshConfigToHosts(sshConfig) {
     const hosts = [];
 
     for (var i = 0; i < sshConfig.length; i++) {
+        // From man ssh_config(5):
+        // "A pattern consists of zero or more non-whitespace characters,
+        //  `*' (a wildcard that matches zero or more characters), or `?'"
+
         const entry = sshConfig[i];
-        if (entry.param == "Host" && entry.value && entry.value.indexOf('*') == -1) {
-            hosts.push(entry.value);
+
+        if (entry.param == "Host" && entry.value) {
+            const entryParts = Array.isArray(entry.value) ? entry.value : [entry.value];
+
+            for (var j = 0; j < entryParts.length; j++) {
+                const pattern = entryParts[j];
+
+                if (pattern.trim() != "" && pattern.indexOf('*') == -1 && pattern.indexOf('?') == -1) {
+                    hosts.push(pattern);
+                }
+            }
         }
     }
 
