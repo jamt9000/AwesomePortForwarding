@@ -24,6 +24,9 @@ cd "$DIR"
 if [ "$(uname)" == "Darwin" ]; then
 defaults write "$DIR"/node_modules/electron/dist/Electron.app/Contents/Info.plist CFBundleName -string "Awesome Port Forwarding" 2>&-
 cp "$DIR"/cat.icns "$DIR"/node_modules/electron/dist/Electron.app/Contents/Resources/electron.icns
+# Try to symlink the Electron.app default app to the base so "Keep in dock" doesn't
+# open the demo app (fragile hack during development to avoid distributing Electron properly)
+ln -s "$DIR" node_modules/electron/dist/Electron.app/Contents/Resources/app
 fi
 
 if [ "$PPID" -eq 1 ]; then

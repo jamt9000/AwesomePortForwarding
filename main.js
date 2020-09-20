@@ -7,9 +7,12 @@ const getFavicons = require('get-website-favicon')
 const getTitleAtUrl = require('get-title-at-url');
 const metafetch = require('metafetch');
 
+// need to chdir if opened by clicking Electron.app
+process.chdir(__dirname);
 
 let win;
 Menu.setApplicationMenu(null);
+
 
 // Data structure representing SSH hosts,
 // remote processes and forwarded ports
@@ -50,6 +53,16 @@ if (process.platform == 'darwin') {
     // Mac does not natively have ssh-askpass or have an X11 DISPLAY, so we
     // need to fake it
     var sshEnv = { ...process.env, "DISPLAY": "1", "SSH_ASKPASS": path.join(__dirname, "askpass.osascript") };
+
+    // Needed to find Homebrew binaries (eg sshfs) when
+    // launched from Dock
+    if (process.env.PATH === undefined) {
+        process.env.PATH = "/usr/local/bin/";
+    } else if (process.env.PATH.indexOf('/usr/local/bin') == -1) {
+        process.env.PATH = `/usr/local/bin/:${process.env.PATH}`;
+    }
+
+    console.log(process.env.PATH);
 } else {
     var sshEnv = { ...process.env };
 }
@@ -360,7 +373,10 @@ ipcMain.on('sshConfigEdit', event => {
     }
 
     // Not very portable
-    execSync('(code ~/.ssh/config || subl ~/.ssh/config || xdg-open ~/.ssh/config || open ~/.ssh/config) &');
+    execSync(`(code ~/.ssh/config || 
+               /usr/local/bin/code ~/.ssh/config || 
+               "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" ~/.ssh/config || 
+               subl ~/.ssh/config || xdg-open ~/.ssh/config || open ~/.ssh/config) &`);
 });
 
 
@@ -631,7 +647,9 @@ ipcMain.on('openTerminal', (event, hostName) => {
 
 ipcMain.on('openVSCode', (event, hostName) => {
     try {
-        execSync('code --remote ssh-remote+' + hostName + ' .')
+        execSync(`code --remote ssh-remote+${hostName} . || 
+                  /usr/local/bin/code --remote ssh-remote+${hostName} . || 
+                 "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --remote ssh-remote+${hostName} .`)
     } catch (e) {
         dialog.showMessageBox({
             "message": "Could not launch VSCode. Make sure it is installed and the `code` command is set up."
@@ -708,13 +726,13 @@ ipcMain.on('openSSHFS', (event, hostName) => {
 ipcMain.on('copyHostConfigToClipboard', (event, hostName) => {
     // Find the config lines that only appear when ~/.ssh/config is used and 
     // and are not in the global config
-    const config = execSync(`comm -23 <(ssh -G ${hostName} | sort) <(ssh -F /etc/ssh/ssh_config -G ${hostName} | sort)`, {'shell': '/bin/bash'});
+    const config = execSync(`comm -23 <(ssh -G ${hostName} | sort) <(ssh -F /etc/ssh/ssh_config -G ${hostName} | sort)`, { 'shell': '/bin/bash' });
     const lines = config.toString().split("\n");
 
     var hostString = `Host ${hostName}\n`;
 
 
-    for (var i=0; i < lines.length; i++) {
+    for (var i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         if (line == '') { continue; }
         console.log(line);
