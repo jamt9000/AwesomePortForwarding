@@ -4,7 +4,6 @@ const path = require('path');
 const fs = require('fs');
 const { spawn, spawnSync, exec, execSync } = require('child_process');
 const getFavicons = require('get-website-favicon')
-const getTitleAtUrl = require('get-title-at-url');
 const metafetch = require('metafetch');
 
 // need to chdir if opened by clicking Electron.app
